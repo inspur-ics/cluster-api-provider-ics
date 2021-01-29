@@ -1,0 +1,19 @@
+domain: cluster.x-k8s.io
+repo: github.com/inspur-ics/cluster-api-provider-ics
+resources:
+- group: infrastructure
+  kind: HAProxyLoadBalancer
+  version: v1alpha3
+- group: infrastructure
+  kind: ICSCluster
+  version: v1alpha3
+- group: infrastructure
+  kind: ICSMachine
+  version: v1alpha3
+- group: infrastructure
+  kind: ICSMachineTemplate
+  version: v1alpha3
+- group: infrastructure
+  kind: ICSVM
+  version: v1alpha3
+version: "2"
