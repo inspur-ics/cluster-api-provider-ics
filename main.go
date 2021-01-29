@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	infrastructurev1alpha3 "github.com/inspur-ics/cluster-api-provider-ics/api/v1alpha3"
+	infrastructurev1alpha4 "github.com/inspur-ics/cluster-api-provider-ics/api/v1alpha4"
 	"github.com/inspur-ics/cluster-api-provider-ics/controllers"
 	// +kubebuilder:scaffold:imports
 )
@@ -40,6 +41,7 @@ func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 
 	_ = infrastructurev1alpha3.AddToScheme(scheme)
+	_ = infrastructurev1alpha4.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -143,6 +145,46 @@ func main() {
 		os.Exit(1)
 	}
 	if err = (&infrastructurev1alpha3.ICSVMList{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "ICSVMList")
+		os.Exit(1)
+	}
+	if err = (&infrastructurev1alpha4.HAProxyLoadBalancer{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "HAProxyLoadBalancer")
+		os.Exit(1)
+	}
+	if err = (&infrastructurev1alpha4.HAProxyLoadBalancerList{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "HAProxyLoadBalancerList")
+		os.Exit(1)
+	}
+	if err = (&infrastructurev1alpha4.ICSCluster{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "ICSCluster")
+		os.Exit(1)
+	}
+	if err = (&infrastructurev1alpha4.ICSClusterList{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "ICSClusterList")
+		os.Exit(1)
+	}
+	if err = (&infrastructurev1alpha4.ICSMachine{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "ICSMachine")
+		os.Exit(1)
+	}
+	if err = (&infrastructurev1alpha4.ICSMachineList{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "ICSMachineList")
+		os.Exit(1)
+	}
+	if err = (&infrastructurev1alpha4.ICSMachineTemplate{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "ICSMachineTemplate")
+		os.Exit(1)
+	}
+	if err = (&infrastructurev1alpha4.ICSMachineTemplateList{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "ICSMachineTemplateList")
+		os.Exit(1)
+	}
+	if err = (&infrastructurev1alpha4.ICSVM{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "ICSVM")
+		os.Exit(1)
+	}
+	if err = (&infrastructurev1alpha4.ICSVMList{}).SetupWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "ICSVMList")
 		os.Exit(1)
 	}
