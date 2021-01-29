@@ -27,29 +27,29 @@ func TestICSMachineTemplate_ValidateCreate(t *testing.T) {
 
 	g := NewWithT(t)
 	tests := []struct {
-		name           string
+		name       string
 		icsMachine *ICSMachineTemplate
-		wantErr        bool
+		wantErr    bool
 	}{
 		{
-			name:           "preferredAPIServerCIDR set on creation ",
+			name:       "preferredAPIServerCIDR set on creation ",
 			icsMachine: createICSMachineTemplate("foo.com", nil, "192.168.0.1/32", []string{}),
-			wantErr:        true,
+			wantErr:    true,
 		},
 		{
-			name:           "ProviderID set on creation",
+			name:       "ProviderID set on creation",
 			icsMachine: createICSMachineTemplate("foo.com", &someProviderID, "", []string{}),
-			wantErr:        true,
+			wantErr:    true,
 		},
 		{
-			name:           "IPs are not in CIDR format",
+			name:       "IPs are not in CIDR format",
 			icsMachine: createICSMachineTemplate("foo.com", nil, "", []string{"192.168.0.1/32", "192.168.0.3"}),
-			wantErr:        true,
+			wantErr:    true,
 		},
 		{
-			name:           "successful ICSMachine creation",
+			name:       "successful ICSMachine creation",
 			icsMachine: createICSMachineTemplate("foo.com", nil, "", []string{"192.168.0.1/32", "192.168.0.3/32"}),
-			wantErr:        true,
+			wantErr:    true,
 		},
 	}
 	for _, tc := range tests {
@@ -70,28 +70,28 @@ func TestICSMachineTemplate_ValidateUpdate(t *testing.T) {
 	g := NewWithT(t)
 
 	tests := []struct {
-		name              string
+		name          string
 		oldICSMachine *ICSMachineTemplate
 		icsMachine    *ICSMachineTemplate
-		wantErr           bool
+		wantErr       bool
 	}{
 		{
-			name:              "ProviderID cannot be updated",
+			name:          "ProviderID cannot be updated",
 			oldICSMachine: createICSMachineTemplate("foo.com", nil, "", []string{"192.168.0.1/32"}),
 			icsMachine:    createICSMachineTemplate("foo.com", &someProviderID, "", []string{"192.168.0.1/32"}),
-			wantErr:           true,
+			wantErr:       true,
 		},
 		{
-			name:              "updating ips cannot be done",
+			name:          "updating ips cannot be done",
 			oldICSMachine: createICSMachineTemplate("foo.com", nil, "", []string{"192.168.0.1/32"}),
 			icsMachine:    createICSMachineTemplate("foo.com", &someProviderID, "", []string{"192.168.0.1/32", "192.168.0.10/32"}),
-			wantErr:           true,
+			wantErr:       true,
 		},
 		{
-			name:              "updating server cannot be done",
+			name:          "updating server cannot be done",
 			oldICSMachine: createICSMachineTemplate("foo.com", nil, "", []string{"192.168.0.1/32"}),
 			icsMachine:    createICSMachineTemplate("baz.com", &someProviderID, "", []string{"192.168.0.1/32", "192.168.0.10/32"}),
-			wantErr:           true,
+			wantErr:       true,
 		},
 	}
 	for _, tc := range tests {

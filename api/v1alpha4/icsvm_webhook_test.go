@@ -32,24 +32,24 @@ func TestICSVM_ValidateCreate(t *testing.T) {
 
 	g := NewWithT(t)
 	tests := []struct {
-		name      string
-		icsVM *ICSVM
-		wantErr   bool
+		name    string
+		icsVM   *ICSVM
+		wantErr bool
 	}{
 		{
-			name:      "preferredAPIServerCIDR set on creation ",
-			icsVM: createICSVM("foo.com", "", "192.168.0.1/32", []string{}, nil),
-			wantErr:   true,
+			name:    "preferredAPIServerCIDR set on creation ",
+			icsVM:   createICSVM("foo.com", "", "192.168.0.1/32", []string{}, nil),
+			wantErr: true,
 		},
 		{
-			name:      "IPs are not in CIDR format",
-			icsVM: createICSVM("foo.com", "", "", []string{"192.168.0.1/32", "192.168.0.3"}, nil),
-			wantErr:   true,
+			name:    "IPs are not in CIDR format",
+			icsVM:   createICSVM("foo.com", "", "", []string{"192.168.0.1/32", "192.168.0.3"}, nil),
+			wantErr: true,
 		},
 		{
-			name:      "successful ICSVM creation",
-			icsVM: createICSVM("foo.com", "", "", []string{"192.168.0.1/32", "192.168.0.3/32"}, nil),
-			wantErr:   false,
+			name:    "successful ICSVM creation",
+			icsVM:   createICSVM("foo.com", "", "", []string{"192.168.0.1/32", "192.168.0.3/32"}, nil),
+			wantErr: false,
 		},
 	}
 	for _, tc := range tests {
@@ -70,34 +70,34 @@ func TestICSVM_ValidateUpdate(t *testing.T) {
 	g := NewWithT(t)
 
 	tests := []struct {
-		name         string
+		name     string
 		oldICSVM *ICSVM
 		icsVM    *ICSVM
-		wantErr      bool
+		wantErr  bool
 	}{
 		{
-			name:         "ProviderID can be updated",
+			name:     "ProviderID can be updated",
 			oldICSVM: createICSVM("foo.com", "", "", []string{"192.168.0.1/32"}, nil),
 			icsVM:    createICSVM("foo.com", biosUUID, "", []string{"192.168.0.1/32"}, nil),
-			wantErr:      false,
+			wantErr:  false,
 		},
 		{
-			name:         "updating ips can be done",
+			name:     "updating ips can be done",
 			oldICSVM: createICSVM("foo.com", "", "", []string{"192.168.0.1/32"}, nil),
 			icsVM:    createICSVM("foo.com", biosUUID, "", []string{"192.168.0.1/32", "192.168.0.10/32"}, nil),
-			wantErr:      false,
+			wantErr:  false,
 		},
 		{
-			name:         "updating bootstrapRef can be done",
+			name:     "updating bootstrapRef can be done",
 			oldICSVM: createICSVM("foo.com", "", "", []string{"192.168.0.1/32"}, nil),
 			icsVM:    createICSVM("foo.com", biosUUID, "", []string{"192.168.0.1/32", "192.168.0.10/32"}, &corev1.ObjectReference{}),
-			wantErr:      false,
+			wantErr:  false,
 		},
 		{
-			name:         "updating server cannot be done",
+			name:     "updating server cannot be done",
 			oldICSVM: createICSVM("foo.com", "", "", []string{"192.168.0.1/32"}, nil),
 			icsVM:    createICSVM("bar.com", biosUUID, "", []string{"192.168.0.1/32", "192.168.0.10/32"}, nil),
-			wantErr:      true,
+			wantErr:  true,
 		},
 	}
 	for _, tc := range tests {
