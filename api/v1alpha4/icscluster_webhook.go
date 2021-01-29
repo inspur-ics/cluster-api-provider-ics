@@ -1,5 +1,5 @@
 /*
-
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,12 +17,10 @@ limitations under the License.
 package v1alpha4
 
 import (
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
-
-// log is for logging in this package.
-var icsclusterlog = logf.Log.WithName("icscluster-resource")
 
 func (r *ICSCluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
@@ -30,4 +28,26 @@ func (r *ICSCluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
+// +kubebuilder:webhook:verbs=create;update,path=/validate-infrastructure-cluster-x-k8s-io-v1alpha4-icscluster,mutating=false,failurePolicy=fail,matchPolicy=Equivalent,groups=infrastructure.cluster.x-k8s.io,resources=icsclusters,versions=v1alpha4,name=validation.icscluster.infrastructure.x-k8s.io,sideEffects=None
+
+// ValidateCreate implements webhook.Validator so a webhook will be registered for the type
+func (r *ICSCluster) ValidateCreate() error {
+	var allErrs field.ErrorList
+	spec := r.Spec
+
+	if spec.Thumbprint != "" && spec.Insecure != nil && *spec.Insecure {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "Insecure"), spec.Insecure, "cannot be set to true at the same time as .spec.Thumbprint"))
+	}
+
+	return aggregateObjErrors(r.GroupVersionKind().GroupKind(), r.Name, allErrs)
+}
+
+// ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
+func (r *ICSCluster) ValidateUpdate(old runtime.Object) error {
+	return nil
+}
+
+// ValidateDelete implements webhook.Validator so a webhook will be registered for the type
+func (r *ICSCluster) ValidateDelete() error {
+	return nil
+}

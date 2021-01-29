@@ -1,0 +1,41 @@
+namePrefix: capv-
+
+commonLabels:
+  cluster.x-k8s.io/provider: "infrastructure-ics"
+
+bases:
+- crd
+- default
+- webhook # Disable this if you're not using the webhook functionality.
+
+patchesJson6902:
+  - target: # NOTE: This patch needs to be repeatd for EACH CustomResourceDefinition you have under crd/bases.
+      group: apiextensions.k8s.io
+      version: v1
+      kind: CustomResourceDefinition
+      name: haproxyloadbalancers.infrastructure.cluster.x-k8s.io
+    path: patch_crd_webhook_namespace.yaml
+  - target: # NOTE: This patch needs to be repeatd for EACH CustomResourceDefinition you have under crd/bases.
+      group: apiextensions.k8s.io
+      version: v1
+      kind: CustomResourceDefinition
+      name: icsclusters.infrastructure.cluster.x-k8s.io
+    path: patch_crd_webhook_namespace.yaml
+  - target: # NOTE: This patch needs to be repeatd for EACH CustomResourceDefinition you have under crd/bases.
+      group: apiextensions.k8s.io
+      version: v1
+      kind: CustomResourceDefinition
+      name: icsmachines.infrastructure.cluster.x-k8s.io
+    path: patch_crd_webhook_namespace.yaml
+  - target: # NOTE: This patch needs to be repeatd for EACH CustomResourceDefinition you have under crd/bases.
+      group: apiextensions.k8s.io
+      version: v1
+      kind: CustomResourceDefinition
+      name: icsmachinetemplates.infrastructure.cluster.x-k8s.io
+    path: patch_crd_webhook_namespace.yaml
+  - target: # NOTE: This patch needs to be repeatd for EACH CustomResourceDefinition you have under crd/bases.
+      group: apiextensions.k8s.io
+      version: v1
+      kind: CustomResourceDefinition
+      name: icsvms.infrastructure.cluster.x-k8s.io
+    path: patch_crd_webhook_namespace.yaml

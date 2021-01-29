@@ -1,5 +1,5 @@
 /*
-
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,28 +17,113 @@ limitations under the License.
 package v1alpha4
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha3"
+	"sigs.k8s.io/cluster-api/errors"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+const (
+	// VMFinalizer allows the reconciler to clean up resources associated
+	// with a ICSVM before removing it from the API Server.
+	VMFinalizer = "icsvm.infrastructure.cluster.x-k8s.io"
+)
 
-// ICSVMSpec defines the desired state of ICSVM
+// ICSVMSpec defines the desired state of ICSVM.
 type ICSVMSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	VirtualMachineCloneSpec `json:",inline"`
 
-	// Foo is an example field of ICSVM. Edit ICSVM_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// BootstrapRef is a reference to a bootstrap provider-specific resource
+	// that holds configuration details.
+	// This field is optional in case no bootstrap data is required to create
+	// a VM.
+	// +optional
+	BootstrapRef *corev1.ObjectReference `json:"bootstrapRef,omitempty"`
+
+	// BiosUUID is the the VM's BIOS UUID that is assigned at runtime after
+	// the VM has been created.
+	// This field is required at runtime for other controllers that read
+	// this CRD as unstructured data.
+	// +optional
+	BiosUUID string `json:"biosUUID,omitempty"`
 }
 
 // ICSVMStatus defines the observed state of ICSVM
 type ICSVMStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Ready is true when the provider resource is ready.
+	// This field is required at runtime for other controllers that read
+	// this CRD as unstructured data.
+	// +optional
+	Ready bool `json:"ready,omitempty"`
+
+	// Addresses is a list of the VM's IP addresses.
+	// This field is required at runtime for other controllers that read
+	// this CRD as unstructured data.
+	// +optional
+	Addresses []string `json:"addresses,omitempty"`
+
+	// CloneMode is the type of clone operation used to clone this VM. Since
+	// LinkedMode is the default but fails gracefully if the source of the
+	// clone has no snapshots, this field may be used to determine the actual
+	// type of clone operation used to create this VM.
+	// +optional
+	CloneMode CloneMode `json:"cloneMode,omitempty"`
+
+	// Snapshot is the name of the snapshot from which the VM was cloned if
+	// LinkedMode is enabled.
+	// +optional
+	Snapshot string `json:"snapshot,omitempty"`
+
+	// TaskRef is a managed object reference to a Task related to the machine.
+	// This value is set automatically at runtime and should not be set or
+	// modified by users.
+	// +optional
+	TaskRef string `json:"taskRef,omitempty"`
+
+	// Network returns the network status for each of the machine's configured
+	// network interfaces.
+	// +optional
+	Network []NetworkStatus `json:"network,omitempty"`
+
+	// FailureReason will be set in the event that there is a terminal problem
+	// reconciling the icsvm and will contain a succinct value suitable
+	// for vm interpretation.
+	//
+	// This field should not be set for transitive errors that a controller
+	// faces that are expected to be fixed automatically over
+	// time (like service outages), but instead indicate that something is
+	// fundamentally wrong with the vm.
+	//
+	// Any transient errors that occur during the reconciliation of icsvms
+	// can be added as events to the icsvm object and/or logged in the
+	// controller's output.
+	// +optional
+	FailureReason *errors.MachineStatusError `json:"failureReason,omitempty"`
+
+	// FailureMessage will be set in the event that there is a terminal problem
+	// reconciling the icsvm and will contain a more verbose string suitable
+	// for logging and human consumption.
+	//
+	// This field should not be set for transitive errors that a controller
+	// faces that are expected to be fixed automatically over
+	// time (like service outages), but instead indicate that something is
+	// fundamentally wrong with the vm.
+	//
+	// Any transient errors that occur during the reconciliation of icsvms
+	// can be added as events to the icsvm object and/or logged in the
+	// controller's output.
+	// +optional
+	FailureMessage *string `json:"failureMessage,omitempty"`
+
+	// Conditions defines current service state of the ICSVM.
+	// +optional
+	Conditions clusterv1.Conditions `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true
+// +kubebuilder:resource:path=icsvms,scope=Namespaced
+// +kubebuilder:storageversion
+// +kubebuilder:subresource:status
 
 // ICSVM is the Schema for the icsvms API
 type ICSVM struct {
@@ -47,6 +132,14 @@ type ICSVM struct {
 
 	Spec   ICSVMSpec   `json:"spec,omitempty"`
 	Status ICSVMStatus `json:"status,omitempty"`
+}
+
+func (m *ICSVM) GetConditions() clusterv1.Conditions {
+	return m.Status.Conditions
+}
+
+func (m *ICSVM) SetConditions(conditions clusterv1.Conditions) {
+	m.Status.Conditions = conditions
 }
 
 // +kubebuilder:object:root=true

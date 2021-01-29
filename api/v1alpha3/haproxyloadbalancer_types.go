@@ -1,5 +1,5 @@
 /*
-
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,25 +20,50 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+const (
+	// HAProxyLoadBalancerFinalizer allows a reconciler to clean up
+	// resources associated with an HAProxyLoadBalancer before removing
+	// it from the API server.
+	HAProxyLoadBalancerFinalizer = "haproxyloadbalancer.infrastructure.cluster.x-k8s.io"
+)
 
-// HAProxyLoadBalancerSpec defines the desired state of HAProxyLoadBalancer
+// HAProxyLoadBalancerSpec defines the desired state of HAProxyLoadBalancer.
 type HAProxyLoadBalancerSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// VirtualMachineConfiguration is information used to deploy a load balancer
+	// VM.
+	VirtualMachineConfiguration VirtualMachineCloneSpec `json:"virtualMachineConfiguration"`
 
-	// Foo is an example field of HAProxyLoadBalancer. Edit HAProxyLoadBalancer_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// SSHUser specifies the name of a user that is granted remote access to the
+	// deployed VM.
+	// +optional
+	User *SSHUser `json:"user,omitempty"`
 }
 
-// HAProxyLoadBalancerStatus defines the observed state of HAProxyLoadBalancer
+// HAProxyLoadBalancerStatus defines the observed state of HAProxyLoadBalancer.
 type HAProxyLoadBalancerStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Ready indicates whether or not the load balancer is ready.
+	//
+	// This field is required as part of the Portable Load Balancer model and is
+	// inspected via an unstructured reader by other controllers to determine
+	// the status of the load balancer.
+	//
+	// +optional
+	Ready bool `json:"ready,omitempty"`
+
+	// Address is the IP address or DNS name of the load balancer.
+	//
+	// This field is required as part of the Portable Load Balancer model and is
+	// inspected via an unstructured reader by other controllers to determine
+	// the status of the load balancer.
+	//
+	// +optional
+	Address string `json:"address,omitempty"`
 }
 
 // +kubebuilder:object:root=true
+// +kubebuilder:resource:path=haproxyloadbalancers,scope=Namespaced
+// +kubebuilder:storageversion
+// +kubebuilder:subresource:status
 
 // HAProxyLoadBalancer is the Schema for the haproxyloadbalancers API
 type HAProxyLoadBalancer struct {

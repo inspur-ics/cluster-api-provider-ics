@@ -1,5 +1,5 @@
 /*
-
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,28 +17,53 @@ limitations under the License.
 package v1alpha3
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+const (
+	// ClusterFinalizer allows ReconcileICSCluster to clean up ics
+	// resources associated with ICSCluster before removing it from the
+	// API server.
+	ClusterFinalizer = "icscluster.infrastructure.cluster.x-k8s.io"
+)
 
 // ICSClusterSpec defines the desired state of ICSCluster
 type ICSClusterSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Server is the address of the ics endpoint.
+	Server string `json:"server,omitempty"`
 
-	// Foo is an example field of ICSCluster. Edit ICSCluster_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// Insecure is a flag that controls whether or not to validate the
+	// ics server's certificate.
+	// +optional
+	Insecure *bool `json:"insecure,omitempty"`
+
+	// CloudProviderConfiguration holds the cluster-wide configuration for the
+	// ics cloud provider.
+	CloudProviderConfiguration CPIConfig `json:"cloudProviderConfiguration,omitempty"`
+
+	// ControlPlaneEndpoint represents the endpoint used to communicate with the control plane.
+	// +optional
+	ControlPlaneEndpoint APIEndpoint `json:"controlPlaneEndpoint"`
+
+	// LoadBalancerRef may be used to enable a control plane load balancer
+	// for this cluster.
+	// When a LoadBalancerRef is provided, the ICSCluster.Status.Ready field
+	// will not be true until the referenced resource is Status.Ready and has a
+	// non-empty Status.Address value.
+	// +optional
+	LoadBalancerRef *corev1.ObjectReference `json:"loadBalancerRef,omitempty"`
 }
 
-// ICSClusterStatus defines the observed state of ICSCluster
+// ICSClusterStatus defines the observed state of ICSClusterSpec
 type ICSClusterStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	Ready bool `json:"ready"`
 }
 
 // +kubebuilder:object:root=true
+// +kubebuilder:resource:path=icsclusters,scope=Namespaced,categories=cluster-api
+// +kubebuilder:storageversion
+// +kubebuilder:subresource:status
 
 // ICSCluster is the Schema for the icsclusters API
 type ICSCluster struct {
