@@ -4,7 +4,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.2.9
+    controller-gen.kubebuilder.io/version: v0.2.6
   creationTimestamp: null
   name: icsclusters.infrastructure.cluster.x-k8s.io
 spec:
@@ -39,8 +39,8 @@ spec:
             description: ICSClusterSpec defines the desired state of ICSCluster
             properties:
               cloudProviderConfiguration:
-                description: 'CloudProviderConfiguration holds the cluster-wide configuration
-                  for the DEPRECATED: will be removed in v1alpha4 ics cloud provider.'
+                description: CloudProviderConfiguration holds the cluster-wide configuration
+                  for the ics cloud provider.
                 properties:
                   disk:
                     description: Disk is the ics cloud provider's disk configuration.
@@ -78,8 +78,8 @@ spec:
                           endpoint.
                         type: string
                       port:
-                        description: Port is the port on which the ics endpoint
-                          is listening. Defaults to 443.
+                        description: Port is the port on which the ics endpoint is
+                          listening. Defaults to 443.
                         type: string
                       roundTripperCount:
                         description: RoundTripperCount specifies the SOAP round tripper
@@ -171,8 +171,8 @@ spec:
                     type: object
                   virtualCenter:
                     additionalProperties:
-                      description: CPIICenterConfig is a ics cloud provider's
-                        iCenter configuration.
+                      description: CPIICenterConfig is a ics cloud provider's iCenter
+                        configuration.
                       properties:
                         datacenters:
                           description: Datacenters is a CSV string of the datacenters
@@ -203,8 +203,7 @@ spec:
                     description: ICenter is a list of iCenter configurations.
                     type: object
                   workspace:
-                    description: Workspace is the ics cloud provider's workspace
-                      configuration.
+                    description: Workspace is the ics cloud provider's workspace configuration.
                     properties:
                       datacenter:
                         description: Datacenter is the datacenter in which VMs are
@@ -221,8 +220,7 @@ spec:
                           are created/located.
                         type: string
                       server:
-                        description: Server is the IP address or FQDN of the ics
-                          endpoint.
+                        description: Server is the IP address or FQDN of the ics endpoint.
                         type: string
                     type: object
                 type: object
@@ -242,16 +240,14 @@ spec:
                 - port
                 type: object
               insecure:
-                description: 'Insecure is a flag that controls whether or not to validate
-                  the ics server''s certificate. DEPRECATED: will be removed in
-                  v1alpha4'
+                description: Insecure is a flag that controls whether or not to validate
+                  the ics server's certificate.
                 type: boolean
               loadBalancerRef:
-                description: 'LoadBalancerRef may be used to enable a control plane
+                description: LoadBalancerRef may be used to enable a control plane
                   load balancer for this cluster. When a LoadBalancerRef is provided,
-                  the ICSCluster.Status.Ready field will not be true until the
-                  referenced resource is Status.Ready and has a non-empty Status.Address
-                  value. DEPRECATED: will be removed in v1alpha4'
+                  the ICSCluster.Status.Ready field will not be true until the referenced
+                  resource is Status.Ready and has a non-empty Status.Address value.
                 properties:
                   apiVersion:
                     description: API version of the referent.
