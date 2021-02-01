@@ -193,11 +193,6 @@ generate-go: $(CONTROLLER_GEN) $(CONVERSION_GEN) ## Runs Go related generate tar
 		paths=./api/... \
 		object:headerFile=./hack/boilerplate/boilerplate.generatego.txt
 
-	$(CONVERSION_GEN) \
-		--input-dirs=./api/v1alpha4 \
-		--output-file-base=zz_generated.conversion \
-		--go-header-file=./hack/boilerplate/boilerplate.generatego.txt
-
 .PHONY: generate-manifests
 generate-manifests: $(CONTROLLER_GEN) ## Generate manifests e.g. CRD, RBAC etc.
 	$(CONTROLLER_GEN) \

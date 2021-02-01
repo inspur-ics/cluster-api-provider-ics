@@ -16,19 +16,4 @@ resources:
 - group: infrastructure
   kind: ICSVM
   version: v1alpha3
-- group: infrastructure
-  kind: HAProxyLoadBalancer
-  version: v1alpha4
-- group: infrastructure
-  kind: ICSCluster
-  version: v1alpha4
-- group: infrastructure
-  kind: ICSMachine
-  version: v1alpha4
-- group: infrastructure
-  kind: ICSMachineTemplate
-  version: v1alpha4
-- group: infrastructure
-  kind: ICSVM
-  version: v1alpha4
-version: "2"
+version: "1"
