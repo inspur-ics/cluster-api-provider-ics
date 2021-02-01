@@ -1,3 +1,5 @@
+// +build tools
+
 /*
 Copyright 2019 The Kubernetes Authors.
 
@@ -13,3 +15,17 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
+// This package imports things required by build scripts, to force `go mod` to see them as dependencies
+package tools
+
+import (
+	_ "github.com/golangci/golangci-lint/cmd/golangci-lint"
+	_ "github.com/onsi/ginkgo/ginkgo"
+	_ "github.com/vmware/govmomi"
+	_ "k8s.io/code-generator/cmd/conversion-gen"
+	_ "sigs.k8s.io/controller-tools/cmd/controller-gen"
+	_ "sigs.k8s.io/kind"
+	_ "sigs.k8s.io/kustomize/kustomize/v3"
+	_ "sigs.k8s.io/testing_frameworks/integration"
+)
