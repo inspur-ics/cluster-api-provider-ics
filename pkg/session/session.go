@@ -33,7 +33,7 @@ import (
 var sessionCache = map[string]Session{}
 var sessionMU sync.Mutex
 
-// Session is a vSphere session with a configured Finder.
+// Session is a ics session with a configured Finder.
 type Session struct {
 	*govmomi.Client
 	Finder     *find.Finder
@@ -58,10 +58,10 @@ func GetOrCreate(
 
 	soapURL, err := soap.ParseURL(server)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error parsing vSphere URL %q", server)
+		return nil, errors.Wrapf(err, "error parsing ics URL %q", server)
 	}
 	if soapURL == nil {
-		return nil, errors.Errorf("error parsing vSphere URL %q", server)
+		return nil, errors.Errorf("error parsing ics URL %q", server)
 	}
 
 	soapURL.User = url.UserPassword(username, password)
@@ -70,7 +70,7 @@ func GetOrCreate(
 	// TODO(ssurana): handle the certs better
 	client, err := govmomi.NewClient(ctx, soapURL, true)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error setting up new vSphere SOAP client")
+		return nil, errors.Wrapf(err, "error setting up new ics SOAP client")
 	}
 
 	session := Session{Client: client}
@@ -91,7 +91,7 @@ func GetOrCreate(
 	sessionCache[sessionKey] = session
 
 	// TODO(akutz) Reintroduce the logger.
-	//ctx.Logger.V(2).Info("cached vSphere client session", "server", server, "datacenter", datacenter)
+	//ctx.Logger.V(2).Info("cached ics client session", "server", server, "datacenter", datacenter)
 
 	return &session, nil
 }
@@ -112,7 +112,7 @@ func (s *Session) FindByInstanceUUID(ctx context.Context, uuid string) (object.R
 
 func (s *Session) findByUUID(ctx context.Context, uuid string, findByInstanceUUID bool) (object.Reference, error) {
 	if s.Client == nil {
-		return nil, errors.New("vSphere client is not initialized")
+		return nil, errors.New("ics client is not initialized")
 	}
 	si := object.NewSearchIndex(s.Client.Client)
 	ref, err := si.FindByUuid(ctx, s.datacenter, uuid, true, &findByInstanceUUID)

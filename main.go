@@ -1,5 +1,5 @@
 /*
-
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,181 +18,211 @@ package main
 
 import (
 	"flag"
+	"math/rand"
+	"net/http"
+	"net/http/pprof"
 	"os"
+	"time"
 
-	"k8s.io/apimachinery/pkg/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"github.com/inspur-ics/cluster-api-provider-ics/api/v1alpha3"
 
-	infrastructurev1alpha3 "github.com/inspur-ics/cluster-api-provider-ics/api/v1alpha3"
-	infrastructurev1alpha4 "github.com/inspur-ics/cluster-api-provider-ics/api/v1alpha4"
+	"k8s.io/klog"
+	"k8s.io/klog/klogr"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
+	ctrlmgr "sigs.k8s.io/controller-runtime/pkg/manager"
+	ctrlsig "sigs.k8s.io/controller-runtime/pkg/manager/signals"
+
 	"github.com/inspur-ics/cluster-api-provider-ics/controllers"
-	// +kubebuilder:scaffold:imports
+	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
+	"github.com/inspur-ics/cluster-api-provider-ics/pkg/manager"
 )
 
 var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	setupLog = ctrllog.Log.WithName("entrypoint")
+
+	managerOpts             manager.Options
+	defaultProfilerAddr     = os.Getenv("PROFILER_ADDR")
+	defaultSyncPeriod       = manager.DefaultSyncPeriod
+	defaultLeaderElectionID = manager.DefaultLeaderElectionID
+	defaultPodName          = manager.DefaultPodName
+	defaultWebhookPort      = manager.DefaultWebhookServiceContainerPort
 )
 
-func init() {
-	_ = clientgoscheme.AddToScheme(scheme)
-
-	_ = infrastructurev1alpha3.AddToScheme(scheme)
-	_ = infrastructurev1alpha4.AddToScheme(scheme)
-	// +kubebuilder:scaffold:scheme
-}
-
+// nolint:gocognit
 func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
-	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
-		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
+	rand.Seed(time.Now().UnixNano())
+
+	klog.InitFlags(nil)
+	ctrllog.SetLogger(klogr.New())
+	if err := flag.Set("v", "2"); err != nil {
+		klog.Fatalf("failed to set log level: %v", err)
+	}
+
+	flag.StringVar(
+		&managerOpts.MetricsAddr,
+		"metrics-addr",
+		":8080",
+		"The address the metric endpoint binds to.")
+	flag.BoolVar(
+		&managerOpts.LeaderElectionEnabled,
+		"enable-leader-election",
+		true,
+		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
+	flag.StringVar(
+		&managerOpts.LeaderElectionID,
+		"leader-election-id",
+		defaultLeaderElectionID,
+		"Name of the config map to use as the locking resource when configuring leader election.")
+	flag.StringVar(
+		&managerOpts.WatchNamespace,
+		"namespace",
+		"",
+		"Namespace that the controller watches to reconcile cluster-api objects. If unspecified, the controller watches for cluster-api objects across all namespaces.")
+	profilerAddress := flag.String(
+		"profiler-address",
+		defaultProfilerAddr,
+		"Bind address to expose the pprof profiler (e.g. localhost:6060)")
+	flag.DurationVar(
+		&managerOpts.SyncPeriod,
+		"sync-period",
+		defaultSyncPeriod,
+		"The interval at which cluster-api objects are synchronized")
+	flag.IntVar(
+		&managerOpts.MaxConcurrentReconciles,
+		"max-concurrent-reconciles",
+		10,
+		"The maximum number of allowed, concurrent reconciles.")
+	flag.StringVar(
+		&managerOpts.PodName,
+		"pod-name",
+		defaultPodName,
+		"The name of the pod running the controller manager.")
+	flag.IntVar(
+		&managerOpts.WebhookPort,
+		"webhook-port",
+		defaultWebhookPort,
+		"Webhook Server port (set to 0 to disable)")
+	flag.StringVar(
+		&managerOpts.HealthAddr,
+		"health-addr",
+		":9440",
+		"The address the health endpoint binds to.",
+	)
+	flag.StringVar(
+		&managerOpts.CredentialsFile,
+		"credentials-file",
+		"/etc/capics/credentials.yaml",
+		"path to CAPV's credentials file",
+	)
+
 	flag.Parse()
 
-	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+	if managerOpts.WatchNamespace != "" {
+		setupLog.Info(
+			"Watching objects only in namespace for reconciliation",
+			"namespace", managerOpts.WatchNamespace)
+	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:             scheme,
-		MetricsBindAddress: metricsAddr,
-		Port:               9443,
-		LeaderElection:     enableLeaderElection,
-		LeaderElectionID:   "fbd9ada9.cluster.x-k8s.io",
-	})
+	if *profilerAddress != "" {
+		setupLog.Info(
+			"Profiler listening for requests",
+			"profiler-address", *profilerAddress)
+		go runProfiler(*profilerAddress)
+	}
+
+	// Create a function that adds all of the controllers and webhooks to the
+	// manager.
+	addToManager := func(ctx *context.ControllerManagerContext, mgr ctrlmgr.Manager) error {
+		if managerOpts.WebhookPort != 0 {
+			if err := (&v1alpha3.ICSCluster{}).SetupWebhookWithManager(mgr); err != nil {
+				return err
+			}
+			if err := (&v1alpha3.ICSClusterList{}).SetupWebhookWithManager(mgr); err != nil {
+				return err
+			}
+
+			if err := (&v1alpha3.ICSMachine{}).SetupWebhookWithManager(mgr); err != nil {
+				return err
+			}
+			if err := (&v1alpha3.ICSMachineList{}).SetupWebhookWithManager(mgr); err != nil {
+				return err
+			}
+
+			if err := (&v1alpha3.ICSMachineTemplate{}).SetupWebhookWithManager(mgr); err != nil {
+				return err
+			}
+			if err := (&v1alpha3.ICSMachineTemplateList{}).SetupWebhookWithManager(mgr); err != nil {
+				return err
+			}
+
+			if err := (&v1alpha3.ICSVM{}).SetupWebhookWithManager(mgr); err != nil {
+				return err
+			}
+			if err := (&v1alpha3.ICSVMList{}).SetupWebhookWithManager(mgr); err != nil {
+				return err
+			}
+
+			if err := (&v1alpha3.HAProxyLoadBalancer{}).SetupWebhookWithManager(mgr); err != nil {
+				return err
+			}
+			if err := (&v1alpha3.HAProxyLoadBalancerList{}).SetupWebhookWithManager(mgr); err != nil {
+				return err
+			}
+		} else {
+			if err := controllers.AddClusterControllerToManager(ctx, mgr); err != nil {
+				return err
+			}
+			if err := controllers.AddMachineControllerToManager(ctx, mgr); err != nil {
+				return err
+			}
+			if err := controllers.AddVMControllerToManager(ctx, mgr); err != nil {
+				return err
+			}
+			if err := controllers.AddHAProxyLoadBalancerControllerToManager(ctx, mgr); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	setupLog.Info("creating controller manager")
+	managerOpts.AddToManager = addToManager
+	mgr, err := manager.New(managerOpts)
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
+		setupLog.Error(err, "problem creating controller manager")
 		os.Exit(1)
 	}
 
-	if err = (&controllers.HAProxyLoadBalancerReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("HAProxyLoadBalancer"),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "HAProxyLoadBalancer")
-		os.Exit(1)
-	}
-	if err = (&controllers.ICSClusterReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("ICSCluster"),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ICSCluster")
-		os.Exit(1)
-	}
-	if err = (&controllers.ICSMachineReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("ICSMachine"),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ICSMachine")
-		os.Exit(1)
-	}
-	if err = (&controllers.ICSMachineTemplateReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("ICSMachineTemplate"),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ICSMachineTemplate")
-		os.Exit(1)
-	}
-	if err = (&controllers.ICSVMReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("ICSVM"),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ICSVM")
-		os.Exit(1)
-	}
-	if err = (&infrastructurev1alpha3.HAProxyLoadBalancer{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "HAProxyLoadBalancer")
-		os.Exit(1)
-	}
-	if err = (&infrastructurev1alpha3.HAProxyLoadBalancerList{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "HAProxyLoadBalancerList")
-		os.Exit(1)
-	}
-	if err = (&infrastructurev1alpha3.ICSCluster{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "ICSCluster")
-		os.Exit(1)
-	}
-	if err = (&infrastructurev1alpha3.ICSClusterList{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "ICSClusterList")
-		os.Exit(1)
-	}
-	if err = (&infrastructurev1alpha3.ICSMachine{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "ICSMachine")
-		os.Exit(1)
-	}
-	if err = (&infrastructurev1alpha3.ICSMachineList{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "ICSMachineList")
-		os.Exit(1)
-	}
-	if err = (&infrastructurev1alpha3.ICSMachineTemplate{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "ICSMachineTemplate")
-		os.Exit(1)
-	}
-	if err = (&infrastructurev1alpha3.ICSMachineTemplateList{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "ICSMachineTemplateList")
-		os.Exit(1)
-	}
-	if err = (&infrastructurev1alpha3.ICSVM{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "ICSVM")
-		os.Exit(1)
-	}
-	if err = (&infrastructurev1alpha3.ICSVMList{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "ICSVMList")
-		os.Exit(1)
-	}
-	if err = (&infrastructurev1alpha4.HAProxyLoadBalancer{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "HAProxyLoadBalancer")
-		os.Exit(1)
-	}
-	if err = (&infrastructurev1alpha4.HAProxyLoadBalancerList{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "HAProxyLoadBalancerList")
-		os.Exit(1)
-	}
-	if err = (&infrastructurev1alpha4.ICSCluster{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "ICSCluster")
-		os.Exit(1)
-	}
-	if err = (&infrastructurev1alpha4.ICSClusterList{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "ICSClusterList")
-		os.Exit(1)
-	}
-	if err = (&infrastructurev1alpha4.ICSMachine{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "ICSMachine")
-		os.Exit(1)
-	}
-	if err = (&infrastructurev1alpha4.ICSMachineList{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "ICSMachineList")
-		os.Exit(1)
-	}
-	if err = (&infrastructurev1alpha4.ICSMachineTemplate{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "ICSMachineTemplate")
-		os.Exit(1)
-	}
-	if err = (&infrastructurev1alpha4.ICSMachineTemplateList{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "ICSMachineTemplateList")
-		os.Exit(1)
-	}
-	if err = (&infrastructurev1alpha4.ICSVM{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "ICSVM")
-		os.Exit(1)
-	}
-	if err = (&infrastructurev1alpha4.ICSVMList{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "ICSVMList")
-		os.Exit(1)
-	}
-	// +kubebuilder:scaffold:builder
+	setupChecks(mgr)
 
-	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
+	sigHandler := ctrlsig.SetupSignalHandler()
+	setupLog.Info("starting controller manager")
+	if err := mgr.Start(sigHandler); err != nil {
+		setupLog.Error(err, "problem running controller manager")
 		os.Exit(1)
 	}
+}
+
+func setupChecks(mgr ctrlmgr.Manager) {
+	if err := mgr.AddReadyzCheck("ping", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to create ready check")
+		os.Exit(1)
+	}
+
+	if err := mgr.AddHealthzCheck("ping", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to create health check")
+		os.Exit(1)
+	}
+}
+
+func runProfiler(addr string) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	_ = http.ListenAndServe(addr, mux)
 }

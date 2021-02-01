@@ -14,17 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package govmomi
+package fake
 
 import (
+	clientrecord "k8s.io/client-go/tools/record"
+
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
-	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/govmomi/esxi"
-	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/govmomi/icenter"
+	"github.com/inspur-ics/cluster-api-provider-ics/pkg/record"
 )
 
-func createVM(ctx *context.VMContext, bootstrapData []byte) error {
-	if ctx.Session.IsVC() {
-		return icenter.Clone(ctx, bootstrapData)
+// NewControllerContext returns a fake ControllerContext for unit testing
+// reconcilers with a fake client.
+func NewControllerContext(ctx *context.ControllerManagerContext) *context.ControllerContext {
+	return &context.ControllerContext{
+		ControllerManagerContext: ctx,
+		Name:                     ControllerName,
+		Logger:                   ctx.Logger.WithName(ControllerName),
+		Recorder:                 record.New(clientrecord.NewFakeRecorder(1024)),
 	}
-	return esxi.Clone(ctx, bootstrapData)
 }

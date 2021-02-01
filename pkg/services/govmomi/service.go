@@ -73,7 +73,7 @@ func (vms *VMService) ReconcileVM(ctx *context.VMContext) (vm infrav1.VirtualMac
 			return vm, err
 		}
 
-		// If the machine was not found by BIOS UUID it means that it got deleted from vcenter directly
+		// If the machine was not found by BIOS UUID it means that it got deleted from icenter directly
 		if wasNotFoundByBIOSUUID(err) {
 			ctx.ICSVM.Status.FailureReason = capierrors.MachineStatusErrorPtr(capierrors.UpdateMachineError)
 			ctx.ICSVM.Status.FailureMessage = pointer.StringPtr(fmt.Sprintf("Unable to find VM by BIOS UUID %s. The vm was removed from infra", ctx.ICSVM.Spec.BiosUUID))

@@ -21,13 +21,13 @@ import (
 
 	"github.com/inspur-ics/cluster-api-provider-ics/api/v1alpha3"
 
+	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
 )
 
 // NOTE: the contents of this file are derived from https://github.com/kubernetes-sigs/ics-csi-driver/tree/master/manifests/1.14
@@ -299,7 +299,7 @@ func ICSCSINodeContainer(image string) corev1.Container {
 				Value: "false",
 			},
 			{
-				Name:  "VSPHERE_CSI_CONFIG",
+				Name:  "ICS_CSI_CONFIG",
 				Value: "/etc/cloud/csi-ics.conf",
 			},
 			{
@@ -510,7 +510,7 @@ func ICSCSIControllerContainer(image string) corev1.Container {
 				Value: "controller",
 			},
 			{
-				Name:  "VSPHERE_CSI_CONFIG",
+				Name:  "ICS_CSI_CONFIG",
 				Value: "/etc/cloud/csi-ics.conf",
 			},
 			{
@@ -571,7 +571,7 @@ func ICSSyncerContainer(image string) corev1.Container {
 				Value: "PRODUCTION",
 			},
 			{
-				Name:  "VSPHERE_CSI_CONFIG",
+				Name:  "ICS_CSI_CONFIG",
 				Value: "/etc/cloud/csi-ics.conf",
 			},
 		},
@@ -635,12 +635,12 @@ func ConfigForCSI(ctx *context.ClusterContext) *v1alpha3.CPIConfig {
 	config.Global.Insecure = ctx.ICSCluster.Spec.CloudProviderConfiguration.Global.Insecure
 	config.Network.Name = ctx.ICSCluster.Spec.CloudProviderConfiguration.Network.Name
 
-	config.VCenter = map[string]v1alpha3.CPIVCenterConfig{}
-	for name, vcenter := range ctx.ICSCluster.Spec.CloudProviderConfiguration.VCenter {
-		config.VCenter[name] = v1alpha3.CPIVCenterConfig{
+	config.ICenter = map[string]v1alpha3.CPIICenterConfig{}
+	for name, icenter := range ctx.ICSCluster.Spec.CloudProviderConfiguration.ICenter {
+		config.ICenter[name] = v1alpha3.CPIICenterConfig{
 			Username:    ctx.Username,
 			Password:    ctx.Password,
-			Datacenters: vcenter.Datacenters,
+			Datacenters: icenter.Datacenters,
 		}
 	}
 

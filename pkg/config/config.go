@@ -14,17 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package govmomi
+package config
 
 import (
-	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
-	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/govmomi/esxi"
-	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/govmomi/icenter"
+	"time"
 )
 
-func createVM(ctx *context.VMContext, bootstrapData []byte) error {
-	if ctx.Session.IsVC() {
-		return icenter.Clone(ctx, bootstrapData)
-	}
-	return esxi.Clone(ctx, bootstrapData)
-}
+var (
+	// DefaultRequeue is the default time for how long to wait when
+	// requeueing a CAPI operation.
+	DefaultRequeue = 20 * time.Second
+)

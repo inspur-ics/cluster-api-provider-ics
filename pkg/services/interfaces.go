@@ -22,7 +22,7 @@ import (
 )
 
 // VirtualMachineService is a service for creating/updating/deleting virtual
-// machines on vSphere.
+// machines on ics.
 type VirtualMachineService interface {
 	// ReconcileVM reconciles a VM with the intended state.
 	ReconcileVM(ctx *context.VMContext) (infrav1.VirtualMachine, error)

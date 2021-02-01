@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package vcenter
+package icenter
 
 import (
 	"github.com/pkg/errors"
@@ -40,7 +40,7 @@ func Clone(ctx *context.VMContext, bootstrapData []byte) error {
 		ControllerContext: ctx.ControllerContext,
 		ICSVM:         ctx.ICSVM,
 		Session:           ctx.Session,
-		Logger:            ctx.Logger.WithName("vcenter"),
+		Logger:            ctx.Logger.WithName("icenter"),
 		PatchHelper:       ctx.PatchHelper,
 	}
 	ctx.Logger.Info("starting clone process")

@@ -69,11 +69,11 @@ type ControllerManagerContext struct {
 	// controller will receive concurrently.
 	MaxConcurrentReconciles int
 
-	// Username is the username for the account used to access remote vSphere
+	// Username is the username for the account used to access remote ics
 	// endpoints.
 	Username string
 
-	// Password is the password for the account used to access remote vSphere
+	// Password is the password for the account used to access remote ics
 	// endpoints.
 	Password string
 
