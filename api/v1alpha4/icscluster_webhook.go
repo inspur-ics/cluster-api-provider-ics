@@ -28,7 +28,7 @@ func (r *ICSCluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-// +kubebuilder:webhook:verbs=create;update,path=/validate-infrastructure-cluster-x-k8s-io-v1alpha4-icscluster,mutating=false,failurePolicy=fail,matchPolicy=Equivalent,groups=infrastructure.cluster.x-k8s.io,resources=icsclusters,versions=v1alpha4,name=validation.icscluster.infrastructure.x-k8s.io,sideEffects=None
+// +kubebuilder:webhook:verbs=create;update,path=/validate-infrastructure-cluster-x-k8s-io-v1alpha4-icscluster,mutating=false,failurePolicy=fail,matchPolicy=Equivalent,groups=infrastructure.cluster.x-k8s.io,resources=icsclusters,versions=v1alpha4,name=validation.icscluster.infrastructure.x-k8s.io
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *ICSCluster) ValidateCreate() error {
