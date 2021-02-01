@@ -27,24 +27,24 @@ func TestICSCluster_ValidateCreate(t *testing.T) {
 
 	g := NewWithT(t)
 	tests := []struct {
-		name           string
+		name       string
 		icsCluster *ICSCluster
-		wantErr        bool
+		wantErr    bool
 	}{
 		{
-			name:           "insecure true with empty thumbprint",
+			name:       "insecure true with empty thumbprint",
 			icsCluster: createICSCluster("foo.com", true, ""),
-			wantErr:        false,
+			wantErr:    false,
 		},
 		{
-			name:           "insecure false with non-empty thumbprint",
+			name:       "insecure false with non-empty thumbprint",
 			icsCluster: createICSCluster("foo.com", false, "thumprint:foo"),
-			wantErr:        false,
+			wantErr:    false,
 		},
 		{
-			name:           "insecure true with non-empty thumbprint",
+			name:       "insecure true with non-empty thumbprint",
 			icsCluster: createICSCluster("foo.com", true, "thumprint:foo"),
-			wantErr:        true,
+			wantErr:    true,
 		},
 	}
 	for _, tc := range tests {
