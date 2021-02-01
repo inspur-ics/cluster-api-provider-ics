@@ -113,7 +113,7 @@ func main() {
 		&managerOpts.CredentialsFile,
 		"credentials-file",
 		"/etc/capics/credentials.yaml",
-		"path to CAPV's credentials file",
+		"path to CAPICS's credentials file",
 	)
 
 	flag.Parse()

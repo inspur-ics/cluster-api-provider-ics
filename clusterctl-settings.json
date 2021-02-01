@@ -1,0 +1,7 @@
+{
+  "name": "infrastructure-ics",
+  "config": {
+    "componentsFile": "infrastructure-components.yaml",
+    "nextVersion": "v0.7.0"
+  }
+}

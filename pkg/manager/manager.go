@@ -36,7 +36,7 @@ import (
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/record"
 )
 
-// Manager is a CAPV controller manager.
+// Manager is a CAPICS controller manager.
 type Manager interface {
 	ctrlmgr.Manager
 
@@ -44,7 +44,7 @@ type Manager interface {
 	GetContext() *context.ControllerManagerContext
 }
 
-// New returns a new CAPV controller manager.
+// New returns a new CAPICS controller manager.
 func New(opts Options) (Manager, error) {
 
 	// Ensure the default options are set.

@@ -42,7 +42,7 @@ import (
 // webhooks to add to the manager.
 type AddToManagerFunc func(*context.ControllerManagerContext, ctrlmgr.Manager) error
 
-// Options describes the options used to create a new CAPV manager.
+// Options describes the options used to create a new CAPICS manager.
 type Options struct {
 	// LeaderElectionEnabled is a flag that enables leader election.
 	LeaderElectionEnabled bool
@@ -101,7 +101,7 @@ type Options struct {
 	// WebhookPort is the port that the webhook server serves at.
 	WebhookPort int
 
-	// CredentialsFile is the file that contains credentials of CAPV
+	// CredentialsFile is the file that contains credentials of CAPICS
 	CredentialsFile string
 
 	Logger     logr.Logger

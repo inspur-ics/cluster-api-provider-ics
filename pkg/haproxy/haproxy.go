@@ -98,7 +98,7 @@ func ClientFromHAPIConfig(config DataplaneConfig) (*hapi.APIClient, error) {
 	return hapi.NewAPIClient(&hapi.Configuration{
 		BasePath:      serverURL.String(),
 		DefaultHeader: headers,
-		UserAgent:     "CAPV HAProxy Load Balancer Client",
+		UserAgent:     "CAPICS HAProxy Load Balancer Client",
 		Debug:         config.Debug,
 		HTTPClient: &http.Client{
 			Jar:     cookieJar,

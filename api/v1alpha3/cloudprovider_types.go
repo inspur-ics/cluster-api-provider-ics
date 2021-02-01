@@ -167,7 +167,7 @@ type CPIGlobalConfig struct {
 	APIBindPort string `gcfg:"api-binding,omitempty" json:"apiBindPort,omitempty"`
 
 	// ClusterID is a unique identifier for a cluster used by the ics CSI driver (CNS)
-	// NOTE: This field is set internally by CAPV and should not be set by any other consumer of this API
+	// NOTE: This field is set internally by CAPICS and should not be set by any other consumer of this API
 	ClusterID string `gcfg:"cluster-id,omitempty" json:"-"`
 }
 

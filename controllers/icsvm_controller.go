@@ -196,7 +196,7 @@ func (r vmReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result, reterr error) 
 		// be compared with < or >, only for equality -
 		// https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions.
 		//
-		// Since CAPV is currently deployed with a single replica, and this
+		// Since CAPICS is currently deployed with a single replica, and this
 		// controller has a max concurrency of one, the only agent updating the
 		// ICSVM resource should be this controller.
 		//
