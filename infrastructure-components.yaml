@@ -1,0 +1,2067 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    cluster.x-k8s.io/provider: infrastructure-ics
+  name: capics-system
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    cert-manager.io/inject-ca-from: capi-webhook-system/capics-serving-cert
+    controller-gen.kubebuilder.io/version: v0.2.6
+  creationTimestamp: null
+  labels:
+    cluster.x-k8s.io/provider: infrastructure-ics
+    cluster.x-k8s.io/v1alpha3: v1alpha3
+  name: haproxyloadbalancers.infrastructure.cluster.x-k8s.io
+spec:
+  conversion:
+    strategy: Webhook
+    webhook:
+      clientConfig:
+        caBundle: Cg==
+        service:
+          name: capics-webhook-service
+          namespace: capi-webhook-system
+          path: /convert
+      conversionReviewVersions:
+      - v1
+      - v1beta1
+  group: infrastructure.cluster.x-k8s.io
+  names:
+    kind: HAProxyLoadBalancer
+    listKind: HAProxyLoadBalancerList
+    plural: haproxyloadbalancers
+    singular: haproxyloadbalancer
+  scope: Namespaced
+  versions:
+  - name: v1alpha3
+    schema:
+      openAPIV3Schema:
+        description: HAProxyLoadBalancer is the Schema for the haproxyloadbalancers
+          API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: HAProxyLoadBalancerSpec defines the desired state of HAProxyLoadBalancer.
+            properties:
+              user:
+                description: SSHUser specifies the name of a user that is granted
+                  remote access to the deployed VM.
+                properties:
+                  authorizedKeys:
+                    description: AuthorizedKeys is one or more public SSH keys that
+                      grant remote access.
+                    items:
+                      type: string
+                    type: array
+                  name:
+                    description: Name is the name of the SSH user.
+                    type: string
+                required:
+                - authorizedKeys
+                - name
+                type: object
+              virtualMachineConfiguration:
+                description: VirtualMachineConfiguration is information used to deploy
+                  a load balancer VM.
+                properties:
+                  cloneMode:
+                    description: CloneMode specifies the type of clone operation.
+                      The LinkedClone mode is only support for templates that have
+                      at least one snapshot. If the template has no snapshots, then
+                      CloneMode defaults to FullClone. When LinkedClone mode is enabled
+                      the DiskGiB field is ignored as it is not possible to expand
+                      disks of linked clones. Defaults to LinkedClone, but fails gracefully
+                      to FullClone if the source of the clone operation has no snapshots.
+                    type: string
+                  datacenter:
+                    description: Datacenter is the name or inventory path of the datacenter
+                      in which the virtual machine is created/located.
+                    type: string
+                  datastore:
+                    description: Datastore is the name or inventory path of the datastore
+                      in which the virtual machine is created/located.
+                    type: string
+                  diskGiB:
+                    description: DiskGiB is the size of a virtual machine's disk,
+                      in GiB. Defaults to the eponymous property value in the template
+                      from which the virtual machine is cloned.
+                    format: int32
+                    type: integer
+                  folder:
+                    description: Folder is the name or inventory path of the folder
+                      in which the virtual machine is created/located.
+                    type: string
+                  memoryMiB:
+                    description: MemoryMiB is the size of a virtual machine's memory,
+                      in MiB. Defaults to the eponymous property value in the template
+                      from which the virtual machine is cloned.
+                    format: int64
+                    type: integer
+                  network:
+                    description: Network is the network configuration for this machine's
+                      VM.
+                    properties:
+                      devices:
+                        description: Devices is the list of network devices used by
+                          the virtual machine. TODO(akutz) Make sure at least one
+                          network matches the             ClusterSpec.CloudProviderConfiguration.Network.Name
+                        items:
+                          description: NetworkDeviceSpec defines the network configuration
+                            for a virtual machine's network device.
+                          properties:
+                            deviceName:
+                              description: DeviceName may be used to explicitly assign
+                                a name to the network device as it exists in the guest
+                                operating system.
+                              type: string
+                            dhcp4:
+                              description: DHCP4 is a flag that indicates whether
+                                or not to use DHCP for IPv4 on this device. If true
+                                then IPAddrs should not contain any IPv4 addresses.
+                              type: boolean
+                            dhcp6:
+                              description: DHCP6 is a flag that indicates whether
+                                or not to use DHCP for IPv6 on this device. If true
+                                then IPAddrs should not contain any IPv6 addresses.
+                              type: boolean
+                            gateway4:
+                              description: Gateway4 is the IPv4 gateway used by this
+                                device. Required when DHCP4 is false.
+                              type: string
+                            gateway6:
+                              description: Gateway4 is the IPv4 gateway used by this
+                                device. Required when DHCP6 is false.
+                              type: string
+                            ipAddrs:
+                              description: IPAddrs is a list of one or more IPv4 and/or
+                                IPv6 addresses to assign to this device. Required
+                                when DHCP4 and DHCP6 are both false.
+                              items:
+                                type: string
+                              type: array
+                            macAddr:
+                              description: MACAddr is the MAC address used by this
+                                device. It is generally a good idea to omit this field
+                                and allow a MAC address to be generated. Please note
+                                that this value must use the InCloud Sphere OUI to
+                                work with the in-tree ics cloud provider.
+                              type: string
+                            mtu:
+                              description: MTU is the device’s Maximum Transmission
+                                Unit size in bytes.
+                              format: int64
+                              type: integer
+                            nameservers:
+                              description: Nameservers is a list of IPv4 and/or IPv6
+                                addresses used as DNS nameservers. Please note that
+                                Linux allows only three nameservers (https://linux.die.net/man/5/resolv.conf).
+                              items:
+                                type: string
+                              type: array
+                            networkName:
+                              description: NetworkName is the name of the ics network
+                                to which the device will be connected.
+                              type: string
+                            routes:
+                              description: Routes is a list of optional, static routes
+                                applied to the device.
+                              items:
+                                description: NetworkRouteSpec defines a static network
+                                  route.
+                                properties:
+                                  metric:
+                                    description: Metric is the weight/priority of
+                                      the route.
+                                    format: int32
+                                    type: integer
+                                  to:
+                                    description: To is an IPv4 or IPv6 address.
+                                    type: string
+                                  via:
+                                    description: Via is an IPv4 or IPv6 address.
+                                    type: string
+                                required:
+                                - metric
+                                - to
+                                - via
+                                type: object
+                              type: array
+                            searchDomains:
+                              description: SearchDomains is a list of search domains
+                                used when resolving IP addresses with DNS.
+                              items:
+                                type: string
+                              type: array
+                          required:
+                          - networkName
+                          type: object
+                        type: array
+                      preferredAPIServerCidr:
+                        description: PreferredAPIServeCIDR is the preferred CIDR for
+                          the Kubernetes API server endpoint on this machine
+                        type: string
+                      routes:
+                        description: Routes is a list of optional, static routes applied
+                          to the virtual machine.
+                        items:
+                          description: NetworkRouteSpec defines a static network route.
+                          properties:
+                            metric:
+                              description: Metric is the weight/priority of the route.
+                              format: int32
+                              type: integer
+                            to:
+                              description: To is an IPv4 or IPv6 address.
+                              type: string
+                            via:
+                              description: Via is an IPv4 or IPv6 address.
+                              type: string
+                          required:
+                          - metric
+                          - to
+                          - via
+                          type: object
+                        type: array
+                    required:
+                    - devices
+                    type: object
+                  numCPUs:
+                    description: NumCPUs is the number of virtual processors in a
+                      virtual machine. Defaults to the eponymous property value in
+                      the template from which the virtual machine is cloned.
+                    format: int32
+                    type: integer
+                  numCoresPerSocket:
+                    description: NumCPUs is the number of cores among which to distribute
+                      CPUs in this virtual machine. Defaults to the eponymous property
+                      value in the template from which the virtual machine is cloned.
+                    format: int32
+                    type: integer
+                  resourcePool:
+                    description: ResourcePool is the name or inventory path of the
+                      resource pool in which the virtual machine is created/located.
+                    type: string
+                  server:
+                    description: Server is the IP address or FQDN of the ics server
+                      on which the virtual machine is created/located.
+                    type: string
+                  snapshot:
+                    description: Snapshot is the name of the snapshot from which to
+                      create a linked clone. This field is ignored if LinkedClone
+                      is not enabled. Defaults to the source's current snapshot.
+                    type: string
+                  template:
+                    description: Template is the name or inventory path of the template
+                      used to clone the virtual machine.
+                    type: string
+                required:
+                - network
+                - template
+                type: object
+            required:
+            - virtualMachineConfiguration
+            type: object
+          status:
+            description: HAProxyLoadBalancerStatus defines the observed state of HAProxyLoadBalancer.
+            properties:
+              address:
+                description: "Address is the IP address or DNS name of the load balancer.
+                  \n This field is required as part of the Portable Load Balancer
+                  model and is inspected via an unstructured reader by other controllers
+                  to determine the status of the load balancer."
+                type: string
+              ready:
+                description: "Ready indicates whether or not the load balancer is
+                  ready. \n This field is required as part of the Portable Load Balancer
+                  model and is inspected via an unstructured reader by other controllers
+                  to determine the status of the load balancer."
+                type: boolean
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    cert-manager.io/inject-ca-from: capi-webhook-system/capics-serving-cert
+    controller-gen.kubebuilder.io/version: v0.2.6
+  creationTimestamp: null
+  labels:
+    cluster.x-k8s.io/provider: infrastructure-ics
+    cluster.x-k8s.io/v1alpha3: v1alpha3
+  name: icsclusters.infrastructure.cluster.x-k8s.io
+spec:
+  conversion:
+    strategy: Webhook
+    webhook:
+      clientConfig:
+        caBundle: Cg==
+        service:
+          name: capics-webhook-service
+          namespace: capi-webhook-system
+          path: /convert
+      conversionReviewVersions:
+      - v1
+      - v1beta1
+  group: infrastructure.cluster.x-k8s.io
+  names:
+    categories:
+    - cluster-api
+    kind: ICSCluster
+    listKind: ICSClusterList
+    plural: icsclusters
+    singular: icscluster
+  scope: Namespaced
+  versions:
+  - name: v1alpha3
+    schema:
+      openAPIV3Schema:
+        description: ICSCluster is the Schema for the icsclusters API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ICSClusterSpec defines the desired state of ICSCluster
+            properties:
+              cloudProviderConfiguration:
+                description: CloudProviderConfiguration holds the cluster-wide configuration
+                  for the ics cloud provider.
+                properties:
+                  disk:
+                    description: Disk is the ics cloud provider's disk configuration.
+                    properties:
+                      scsiControllerType:
+                        description: SCSIControllerType defines SCSI controller to
+                          be used.
+                        type: string
+                    type: object
+                  global:
+                    description: Global is the ics cloud provider's global configuration.
+                    properties:
+                      apiBindPort:
+                        description: APIBindPort configures the ics cloud controller
+                          manager API port. Defaults to 43001.
+                        type: string
+                      apiDisable:
+                        description: APIDisable disables the ics cloud controller
+                          manager API. Defaults to true.
+                        type: boolean
+                      caFile:
+                        description: CAFile Specifies the path to a CA certificate
+                          in PEM format. If not configured, the system's CA certificates
+                          will be used.
+                        type: string
+                      datacenters:
+                        description: Datacenters is a CSV string of the datacenters
+                          in which VMs are located.
+                        type: string
+                      insecure:
+                        description: Insecure is a flag that disables TLS peer verification.
+                        type: boolean
+                      password:
+                        description: Password is the password used to access a ics
+                          endpoint.
+                        type: string
+                      port:
+                        description: Port is the port on which the ics endpoint is
+                          listening. Defaults to 443.
+                        type: string
+                      roundTripperCount:
+                        description: RoundTripperCount specifies the SOAP round tripper
+                          count (retries = RoundTripper - 1)
+                        format: int32
+                        type: integer
+                      secretName:
+                        description: SecretName is the name of the Kubernetes secret
+                          in which the ics credentials are located.
+                        type: string
+                      secretNamespace:
+                        description: SecretNamespace is the namespace for SecretName.
+                        type: string
+                      secretsDirectory:
+                        description: 'SecretsDirectory is a directory in which secrets
+                          may be found. This may used in the event that: 1. It is
+                          not desirable to use the K8s API to watch changes to secrets
+                          2. The cloud controller manager is not running in a K8s
+                          environment,    such as DC/OS. For example, the container
+                          storage interface (CSI) is    container orcehstrator (CO)
+                          agnostic, and should support non-K8s COs. Defaults to /etc/cloud/credentials.'
+                        type: string
+                      serviceAccount:
+                        description: ServiceAccount is the Kubernetes service account
+                          used to launch the cloud controller manager. Defaults to
+                          cloud-controller-manager.
+                        type: string
+                      thumbprint:
+                        description: Thumbprint is the cryptographic thumbprint of
+                          the ics endpoint's certificate.
+                        type: string
+                      username:
+                        description: Username is the username used to access a ics
+                          endpoint.
+                        type: string
+                    type: object
+                  labels:
+                    description: Labels is the ics cloud provider's zone and region
+                      configuration.
+                    properties:
+                      region:
+                        description: Region is the region in which VMs are created/located.
+                        type: string
+                      zone:
+                        description: Zone is the zone in which VMs are created/located.
+                        type: string
+                    type: object
+                  network:
+                    description: Network is the ics cloud provider's network configuration.
+                    properties:
+                      name:
+                        description: Name is the name of the network to which VMs
+                          are connected.
+                        type: string
+                    type: object
+                  providerConfig:
+                    description: CPIProviderConfig contains extra information used
+                      to configure the ics cloud provider.
+                    properties:
+                      cloud:
+                        properties:
+                          controllerImage:
+                            type: string
+                          extraArgs:
+                            additionalProperties:
+                              type: string
+                            description: ExtraArgs passes through extra arguments
+                              to the cloud provider. The arguments here are passed
+                              to the cloud provider daemonset specification
+                            type: object
+                        type: object
+                      storage:
+                        properties:
+                          attacherImage:
+                            type: string
+                          controllerImage:
+                            type: string
+                          livenessProbeImage:
+                            type: string
+                          metadataSyncerImage:
+                            type: string
+                          nodeDriverImage:
+                            type: string
+                          provisionerImage:
+                            type: string
+                          registrarImage:
+                            type: string
+                        type: object
+                    type: object
+                  virtualCenter:
+                    additionalProperties:
+                      description: CPIICenterConfig is a ics cloud provider's iCenter
+                        configuration.
+                      properties:
+                        datacenters:
+                          description: Datacenters is a CSV string of the datacenters
+                            in which VMs are located.
+                          type: string
+                        password:
+                          description: Password is the password used to access a ics
+                            endpoint.
+                          type: string
+                        port:
+                          description: Port is the port on which the ics endpoint
+                            is listening. Defaults to 443.
+                          type: string
+                        roundTripperCount:
+                          description: RoundTripperCount specifies the SOAP round
+                            tripper count (retries = RoundTripper - 1)
+                          format: int32
+                          type: integer
+                        thumbprint:
+                          description: Thumbprint is the cryptographic thumbprint
+                            of the ics endpoint's certificate.
+                          type: string
+                        username:
+                          description: Username is the username used to access a ics
+                            endpoint.
+                          type: string
+                      type: object
+                    description: ICenter is a list of iCenter configurations.
+                    type: object
+                  workspace:
+                    description: Workspace is the ics cloud provider's workspace configuration.
+                    properties:
+                      datacenter:
+                        description: Datacenter is the datacenter in which VMs are
+                          created/located.
+                        type: string
+                      datastore:
+                        description: Datastore is the datastore in which VMs are created/located.
+                        type: string
+                      folder:
+                        description: Folder is the folder in which VMs are created/located.
+                        type: string
+                      resourcePool:
+                        description: ResourcePool is the resource pool in which VMs
+                          are created/located.
+                        type: string
+                      server:
+                        description: Server is the IP address or FQDN of the ics endpoint.
+                        type: string
+                    type: object
+                type: object
+              controlPlaneEndpoint:
+                description: ControlPlaneEndpoint represents the endpoint used to
+                  communicate with the control plane.
+                properties:
+                  host:
+                    description: The hostname on which the API server is serving.
+                    type: string
+                  port:
+                    description: The port on which the API server is serving.
+                    format: int32
+                    type: integer
+                required:
+                - host
+                - port
+                type: object
+              insecure:
+                description: Insecure is a flag that controls whether or not to validate
+                  the ics server's certificate.
+                type: boolean
+              loadBalancerRef:
+                description: LoadBalancerRef may be used to enable a control plane
+                  load balancer for this cluster. When a LoadBalancerRef is provided,
+                  the ICSCluster.Status.Ready field will not be true until the referenced
+                  resource is Status.Ready and has a non-empty Status.Address value.
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: 'If referring to a piece of an object instead of
+                      an entire object, this string should contain a valid JSON/Go
+                      field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within
+                      a pod, this would take on a value like: "spec.containers{name}"
+                      (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]"
+                      (container with index 2 in this pod). This syntax is chosen
+                      only to have some well-defined way of referencing a part of
+                      an object. TODO: this design is not final and this field is
+                      subject to change in the future.'
+                    type: string
+                  kind:
+                    description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                    type: string
+                  name:
+                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                    type: string
+                  namespace:
+                    description: 'Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
+                    type: string
+                  resourceVersion:
+                    description: 'Specific resourceVersion to which this reference
+                      is made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
+                    type: string
+                  uid:
+                    description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
+                    type: string
+                type: object
+              server:
+                description: Server is the address of the ics endpoint.
+                type: string
+            type: object
+          status:
+            description: ICSClusterStatus defines the observed state of ICSClusterSpec
+            properties:
+              ready:
+                type: boolean
+            required:
+            - ready
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    cert-manager.io/inject-ca-from: capi-webhook-system/capics-serving-cert
+    controller-gen.kubebuilder.io/version: v0.2.6
+  creationTimestamp: null
+  labels:
+    cluster.x-k8s.io/provider: infrastructure-ics
+    cluster.x-k8s.io/v1alpha3: v1alpha3
+  name: icsmachines.infrastructure.cluster.x-k8s.io
+spec:
+  conversion:
+    strategy: Webhook
+    webhook:
+      clientConfig:
+        caBundle: Cg==
+        service:
+          name: capics-webhook-service
+          namespace: capi-webhook-system
+          path: /convert
+      conversionReviewVersions:
+      - v1
+      - v1beta1
+  group: infrastructure.cluster.x-k8s.io
+  names:
+    categories:
+    - cluster-api
+    kind: ICSMachine
+    listKind: ICSMachineList
+    plural: icsmachines
+    singular: icsmachine
+  scope: Namespaced
+  versions:
+  - name: v1alpha3
+    schema:
+      openAPIV3Schema:
+        description: ICSMachine is the Schema for the icsmachines API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ICSMachineSpec defines the desired state of ICSMachine
+            properties:
+              cloneMode:
+                description: CloneMode specifies the type of clone operation. The
+                  LinkedClone mode is only support for templates that have at least
+                  one snapshot. If the template has no snapshots, then CloneMode defaults
+                  to FullClone. When LinkedClone mode is enabled the DiskGiB field
+                  is ignored as it is not possible to expand disks of linked clones.
+                  Defaults to LinkedClone, but fails gracefully to FullClone if the
+                  source of the clone operation has no snapshots.
+                type: string
+              datacenter:
+                description: Datacenter is the name or inventory path of the datacenter
+                  in which the virtual machine is created/located.
+                type: string
+              datastore:
+                description: Datastore is the name or inventory path of the datastore
+                  in which the virtual machine is created/located.
+                type: string
+              diskGiB:
+                description: DiskGiB is the size of a virtual machine's disk, in GiB.
+                  Defaults to the eponymous property value in the template from which
+                  the virtual machine is cloned.
+                format: int32
+                type: integer
+              folder:
+                description: Folder is the name or inventory path of the folder in
+                  which the virtual machine is created/located.
+                type: string
+              memoryMiB:
+                description: MemoryMiB is the size of a virtual machine's memory,
+                  in MiB. Defaults to the eponymous property value in the template
+                  from which the virtual machine is cloned.
+                format: int64
+                type: integer
+              network:
+                description: Network is the network configuration for this machine's
+                  VM.
+                properties:
+                  devices:
+                    description: Devices is the list of network devices used by the
+                      virtual machine. TODO(akutz) Make sure at least one network
+                      matches the             ClusterSpec.CloudProviderConfiguration.Network.Name
+                    items:
+                      description: NetworkDeviceSpec defines the network configuration
+                        for a virtual machine's network device.
+                      properties:
+                        deviceName:
+                          description: DeviceName may be used to explicitly assign
+                            a name to the network device as it exists in the guest
+                            operating system.
+                          type: string
+                        dhcp4:
+                          description: DHCP4 is a flag that indicates whether or not
+                            to use DHCP for IPv4 on this device. If true then IPAddrs
+                            should not contain any IPv4 addresses.
+                          type: boolean
+                        dhcp6:
+                          description: DHCP6 is a flag that indicates whether or not
+                            to use DHCP for IPv6 on this device. If true then IPAddrs
+                            should not contain any IPv6 addresses.
+                          type: boolean
+                        gateway4:
+                          description: Gateway4 is the IPv4 gateway used by this device.
+                            Required when DHCP4 is false.
+                          type: string
+                        gateway6:
+                          description: Gateway4 is the IPv4 gateway used by this device.
+                            Required when DHCP6 is false.
+                          type: string
+                        ipAddrs:
+                          description: IPAddrs is a list of one or more IPv4 and/or
+                            IPv6 addresses to assign to this device. Required when
+                            DHCP4 and DHCP6 are both false.
+                          items:
+                            type: string
+                          type: array
+                        macAddr:
+                          description: MACAddr is the MAC address used by this device.
+                            It is generally a good idea to omit this field and allow
+                            a MAC address to be generated. Please note that this value
+                            must use the InCloud Sphere OUI to work with the in-tree
+                            ics cloud provider.
+                          type: string
+                        mtu:
+                          description: MTU is the device’s Maximum Transmission Unit
+                            size in bytes.
+                          format: int64
+                          type: integer
+                        nameservers:
+                          description: Nameservers is a list of IPv4 and/or IPv6 addresses
+                            used as DNS nameservers. Please note that Linux allows
+                            only three nameservers (https://linux.die.net/man/5/resolv.conf).
+                          items:
+                            type: string
+                          type: array
+                        networkName:
+                          description: NetworkName is the name of the ics network
+                            to which the device will be connected.
+                          type: string
+                        routes:
+                          description: Routes is a list of optional, static routes
+                            applied to the device.
+                          items:
+                            description: NetworkRouteSpec defines a static network
+                              route.
+                            properties:
+                              metric:
+                                description: Metric is the weight/priority of the
+                                  route.
+                                format: int32
+                                type: integer
+                              to:
+                                description: To is an IPv4 or IPv6 address.
+                                type: string
+                              via:
+                                description: Via is an IPv4 or IPv6 address.
+                                type: string
+                            required:
+                            - metric
+                            - to
+                            - via
+                            type: object
+                          type: array
+                        searchDomains:
+                          description: SearchDomains is a list of search domains used
+                            when resolving IP addresses with DNS.
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - networkName
+                      type: object
+                    type: array
+                  preferredAPIServerCidr:
+                    description: PreferredAPIServeCIDR is the preferred CIDR for the
+                      Kubernetes API server endpoint on this machine
+                    type: string
+                  routes:
+                    description: Routes is a list of optional, static routes applied
+                      to the virtual machine.
+                    items:
+                      description: NetworkRouteSpec defines a static network route.
+                      properties:
+                        metric:
+                          description: Metric is the weight/priority of the route.
+                          format: int32
+                          type: integer
+                        to:
+                          description: To is an IPv4 or IPv6 address.
+                          type: string
+                        via:
+                          description: Via is an IPv4 or IPv6 address.
+                          type: string
+                      required:
+                      - metric
+                      - to
+                      - via
+                      type: object
+                    type: array
+                required:
+                - devices
+                type: object
+              numCPUs:
+                description: NumCPUs is the number of virtual processors in a virtual
+                  machine. Defaults to the eponymous property value in the template
+                  from which the virtual machine is cloned.
+                format: int32
+                type: integer
+              numCoresPerSocket:
+                description: NumCPUs is the number of cores among which to distribute
+                  CPUs in this virtual machine. Defaults to the eponymous property
+                  value in the template from which the virtual machine is cloned.
+                format: int32
+                type: integer
+              providerID:
+                description: ProviderID is the virtual machine's BIOS UUID formated
+                  as ics://12345678-1234-1234-1234-123456789abc
+                type: string
+              resourcePool:
+                description: ResourcePool is the name or inventory path of the resource
+                  pool in which the virtual machine is created/located.
+                type: string
+              server:
+                description: Server is the IP address or FQDN of the ics server on
+                  which the virtual machine is created/located.
+                type: string
+              snapshot:
+                description: Snapshot is the name of the snapshot from which to create
+                  a linked clone. This field is ignored if LinkedClone is not enabled.
+                  Defaults to the source's current snapshot.
+                type: string
+              template:
+                description: Template is the name or inventory path of the template
+                  used to clone the virtual machine.
+                type: string
+            required:
+            - network
+            - template
+            type: object
+          status:
+            description: ICSMachineStatus defines the observed state of ICSMachine
+            properties:
+              addresses:
+                description: Addresses contains the ICS instance associated addresses.
+                items:
+                  description: MachineAddress contains information for the node's
+                    address.
+                  properties:
+                    address:
+                      description: The machine address.
+                      type: string
+                    type:
+                      description: Machine address type, one of Hostname, ExternalIP
+                        or InternalIP.
+                      type: string
+                  required:
+                  - address
+                  - type
+                  type: object
+                type: array
+              failureMessage:
+                description: "FailureMessage will be set in the event that there is
+                  a terminal problem reconciling the Machine and will contain a more
+                  verbose string suitable for logging and human consumption. \n This
+                  field should not be set for transitive errors that a controller
+                  faces that are expected to be fixed automatically over time (like
+                  service outages), but instead indicate that something is fundamentally
+                  wrong with the Machine's spec or the configuration of the controller,
+                  and that manual intervention is required. Examples of terminal errors
+                  would be invalid combinations of settings in the spec, values that
+                  are unsupported by the controller, or the responsible controller
+                  itself being critically misconfigured. \n Any transient errors that
+                  occur during the reconciliation of Machines can be added as events
+                  to the Machine object and/or logged in the controller's output."
+                type: string
+              failureReason:
+                description: "FailureReason will be set in the event that there is
+                  a terminal problem reconciling the Machine and will contain a succinct
+                  value suitable for machine interpretation. \n This field should
+                  not be set for transitive errors that a controller faces that are
+                  expected to be fixed automatically over time (like service outages),
+                  but instead indicate that something is fundamentally wrong with
+                  the Machine's spec or the configuration of the controller, and that
+                  manual intervention is required. Examples of terminal errors would
+                  be invalid combinations of settings in the spec, values that are
+                  unsupported by the controller, or the responsible controller itself
+                  being critically misconfigured. \n Any transient errors that occur
+                  during the reconciliation of Machines can be added as events to
+                  the Machine object and/or logged in the controller's output."
+                type: string
+              network:
+                description: Network returns the network status for each of the machine's
+                  configured network interfaces.
+                items:
+                  description: NetworkStatus provides information about one of a VM's
+                    networks.
+                  properties:
+                    connected:
+                      description: Connected is a flag that indicates whether this
+                        network is currently connected to the VM.
+                      type: boolean
+                    ipAddrs:
+                      description: IPAddrs is one or more IP addresses reported by
+                        vm-tools.
+                      items:
+                        type: string
+                      type: array
+                    macAddr:
+                      description: MACAddr is the MAC address of the network device.
+                      type: string
+                    networkName:
+                      description: NetworkName is the name of the network.
+                      type: string
+                  required:
+                  - macAddr
+                  type: object
+                type: array
+              ready:
+                description: Ready is true when the provider resource is ready.
+                type: boolean
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    cert-manager.io/inject-ca-from: capi-webhook-system/capics-serving-cert
+    controller-gen.kubebuilder.io/version: v0.2.6
+  creationTimestamp: null
+  labels:
+    cluster.x-k8s.io/provider: infrastructure-ics
+    cluster.x-k8s.io/v1alpha3: v1alpha3
+  name: icsmachinetemplates.infrastructure.cluster.x-k8s.io
+spec:
+  conversion:
+    strategy: Webhook
+    webhook:
+      clientConfig:
+        caBundle: Cg==
+        service:
+          name: capics-webhook-service
+          namespace: capi-webhook-system
+          path: /convert
+      conversionReviewVersions:
+      - v1
+      - v1beta1
+  group: infrastructure.cluster.x-k8s.io
+  names:
+    categories:
+    - cluster-api
+    kind: ICSMachineTemplate
+    listKind: ICSMachineTemplateList
+    plural: icsmachinetemplates
+    singular: icsmachinetemplate
+  scope: Namespaced
+  versions:
+  - name: v1alpha3
+    schema:
+      openAPIV3Schema:
+        description: ICSMachineTemplate is the Schema for the icsmachinetemplates
+          API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ICSMachineTemplateSpec defines the desired state of ICSMachineTemplate
+            properties:
+              template:
+                description: ICSMachineTemplateResource describes the data needed
+                  to create a ICSMachine from a template
+                properties:
+                  spec:
+                    description: Spec is the specification of the desired behavior
+                      of the machine.
+                    properties:
+                      cloneMode:
+                        description: CloneMode specifies the type of clone operation.
+                          The LinkedClone mode is only support for templates that
+                          have at least one snapshot. If the template has no snapshots,
+                          then CloneMode defaults to FullClone. When LinkedClone mode
+                          is enabled the DiskGiB field is ignored as it is not possible
+                          to expand disks of linked clones. Defaults to LinkedClone,
+                          but fails gracefully to FullClone if the source of the clone
+                          operation has no snapshots.
+                        type: string
+                      datacenter:
+                        description: Datacenter is the name or inventory path of the
+                          datacenter in which the virtual machine is created/located.
+                        type: string
+                      datastore:
+                        description: Datastore is the name or inventory path of the
+                          datastore in which the virtual machine is created/located.
+                        type: string
+                      diskGiB:
+                        description: DiskGiB is the size of a virtual machine's disk,
+                          in GiB. Defaults to the eponymous property value in the
+                          template from which the virtual machine is cloned.
+                        format: int32
+                        type: integer
+                      folder:
+                        description: Folder is the name or inventory path of the folder
+                          in which the virtual machine is created/located.
+                        type: string
+                      memoryMiB:
+                        description: MemoryMiB is the size of a virtual machine's
+                          memory, in MiB. Defaults to the eponymous property value
+                          in the template from which the virtual machine is cloned.
+                        format: int64
+                        type: integer
+                      network:
+                        description: Network is the network configuration for this
+                          machine's VM.
+                        properties:
+                          devices:
+                            description: Devices is the list of network devices used
+                              by the virtual machine. TODO(akutz) Make sure at least
+                              one network matches the             ClusterSpec.CloudProviderConfiguration.Network.Name
+                            items:
+                              description: NetworkDeviceSpec defines the network configuration
+                                for a virtual machine's network device.
+                              properties:
+                                deviceName:
+                                  description: DeviceName may be used to explicitly
+                                    assign a name to the network device as it exists
+                                    in the guest operating system.
+                                  type: string
+                                dhcp4:
+                                  description: DHCP4 is a flag that indicates whether
+                                    or not to use DHCP for IPv4 on this device. If
+                                    true then IPAddrs should not contain any IPv4
+                                    addresses.
+                                  type: boolean
+                                dhcp6:
+                                  description: DHCP6 is a flag that indicates whether
+                                    or not to use DHCP for IPv6 on this device. If
+                                    true then IPAddrs should not contain any IPv6
+                                    addresses.
+                                  type: boolean
+                                gateway4:
+                                  description: Gateway4 is the IPv4 gateway used by
+                                    this device. Required when DHCP4 is false.
+                                  type: string
+                                gateway6:
+                                  description: Gateway4 is the IPv4 gateway used by
+                                    this device. Required when DHCP6 is false.
+                                  type: string
+                                ipAddrs:
+                                  description: IPAddrs is a list of one or more IPv4
+                                    and/or IPv6 addresses to assign to this device.
+                                    Required when DHCP4 and DHCP6 are both false.
+                                  items:
+                                    type: string
+                                  type: array
+                                macAddr:
+                                  description: MACAddr is the MAC address used by
+                                    this device. It is generally a good idea to omit
+                                    this field and allow a MAC address to be generated.
+                                    Please note that this value must use the InCloud
+                                    Sphere OUI to work with the in-tree ics cloud
+                                    provider.
+                                  type: string
+                                mtu:
+                                  description: MTU is the device’s Maximum Transmission
+                                    Unit size in bytes.
+                                  format: int64
+                                  type: integer
+                                nameservers:
+                                  description: Nameservers is a list of IPv4 and/or
+                                    IPv6 addresses used as DNS nameservers. Please
+                                    note that Linux allows only three nameservers
+                                    (https://linux.die.net/man/5/resolv.conf).
+                                  items:
+                                    type: string
+                                  type: array
+                                networkName:
+                                  description: NetworkName is the name of the ics
+                                    network to which the device will be connected.
+                                  type: string
+                                routes:
+                                  description: Routes is a list of optional, static
+                                    routes applied to the device.
+                                  items:
+                                    description: NetworkRouteSpec defines a static
+                                      network route.
+                                    properties:
+                                      metric:
+                                        description: Metric is the weight/priority
+                                          of the route.
+                                        format: int32
+                                        type: integer
+                                      to:
+                                        description: To is an IPv4 or IPv6 address.
+                                        type: string
+                                      via:
+                                        description: Via is an IPv4 or IPv6 address.
+                                        type: string
+                                    required:
+                                    - metric
+                                    - to
+                                    - via
+                                    type: object
+                                  type: array
+                                searchDomains:
+                                  description: SearchDomains is a list of search domains
+                                    used when resolving IP addresses with DNS.
+                                  items:
+                                    type: string
+                                  type: array
+                              required:
+                              - networkName
+                              type: object
+                            type: array
+                          preferredAPIServerCidr:
+                            description: PreferredAPIServeCIDR is the preferred CIDR
+                              for the Kubernetes API server endpoint on this machine
+                            type: string
+                          routes:
+                            description: Routes is a list of optional, static routes
+                              applied to the virtual machine.
+                            items:
+                              description: NetworkRouteSpec defines a static network
+                                route.
+                              properties:
+                                metric:
+                                  description: Metric is the weight/priority of the
+                                    route.
+                                  format: int32
+                                  type: integer
+                                to:
+                                  description: To is an IPv4 or IPv6 address.
+                                  type: string
+                                via:
+                                  description: Via is an IPv4 or IPv6 address.
+                                  type: string
+                              required:
+                              - metric
+                              - to
+                              - via
+                              type: object
+                            type: array
+                        required:
+                        - devices
+                        type: object
+                      numCPUs:
+                        description: NumCPUs is the number of virtual processors in
+                          a virtual machine. Defaults to the eponymous property value
+                          in the template from which the virtual machine is cloned.
+                        format: int32
+                        type: integer
+                      numCoresPerSocket:
+                        description: NumCPUs is the number of cores among which to
+                          distribute CPUs in this virtual machine. Defaults to the
+                          eponymous property value in the template from which the
+                          virtual machine is cloned.
+                        format: int32
+                        type: integer
+                      providerID:
+                        description: ProviderID is the virtual machine's BIOS UUID
+                          formated as ics://12345678-1234-1234-1234-123456789abc
+                        type: string
+                      resourcePool:
+                        description: ResourcePool is the name or inventory path of
+                          the resource pool in which the virtual machine is created/located.
+                        type: string
+                      server:
+                        description: Server is the IP address or FQDN of the ics server
+                          on which the virtual machine is created/located.
+                        type: string
+                      snapshot:
+                        description: Snapshot is the name of the snapshot from which
+                          to create a linked clone. This field is ignored if LinkedClone
+                          is not enabled. Defaults to the source's current snapshot.
+                        type: string
+                      template:
+                        description: Template is the name or inventory path of the
+                          template used to clone the virtual machine.
+                        type: string
+                    required:
+                    - network
+                    - template
+                    type: object
+                required:
+                - spec
+                type: object
+            required:
+            - template
+            type: object
+        type: object
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    cert-manager.io/inject-ca-from: capi-webhook-system/capics-serving-cert
+    controller-gen.kubebuilder.io/version: v0.2.6
+  creationTimestamp: null
+  labels:
+    cluster.x-k8s.io/provider: infrastructure-ics
+    cluster.x-k8s.io/v1alpha3: v1alpha3
+  name: icsvms.infrastructure.cluster.x-k8s.io
+spec:
+  conversion:
+    strategy: Webhook
+    webhook:
+      clientConfig:
+        caBundle: Cg==
+        service:
+          name: capics-webhook-service
+          namespace: capi-webhook-system
+          path: /convert
+      conversionReviewVersions:
+      - v1
+      - v1beta1
+  group: infrastructure.cluster.x-k8s.io
+  names:
+    kind: ICSVM
+    listKind: ICSVMList
+    plural: icsvms
+    singular: icsvm
+  scope: Namespaced
+  versions:
+  - name: v1alpha3
+    schema:
+      openAPIV3Schema:
+        description: ICSVM is the Schema for the icsvms API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ICSVMSpec defines the desired state of ICSVM.
+            properties:
+              biosUUID:
+                description: BiosUUID is the the VM's BIOS UUID that is assigned at
+                  runtime after the VM has been created. This field is required at
+                  runtime for other controllers that read this CRD as unstructured
+                  data.
+                type: string
+              bootstrapRef:
+                description: BootstrapRef is a reference to a bootstrap provider-specific
+                  resource that holds configuration details. This field is optional
+                  in case no bootstrap data is required to create a VM.
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: 'If referring to a piece of an object instead of
+                      an entire object, this string should contain a valid JSON/Go
+                      field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within
+                      a pod, this would take on a value like: "spec.containers{name}"
+                      (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]"
+                      (container with index 2 in this pod). This syntax is chosen
+                      only to have some well-defined way of referencing a part of
+                      an object. TODO: this design is not final and this field is
+                      subject to change in the future.'
+                    type: string
+                  kind:
+                    description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                    type: string
+                  name:
+                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                    type: string
+                  namespace:
+                    description: 'Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
+                    type: string
+                  resourceVersion:
+                    description: 'Specific resourceVersion to which this reference
+                      is made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
+                    type: string
+                  uid:
+                    description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
+                    type: string
+                type: object
+              cloneMode:
+                description: CloneMode specifies the type of clone operation. The
+                  LinkedClone mode is only support for templates that have at least
+                  one snapshot. If the template has no snapshots, then CloneMode defaults
+                  to FullClone. When LinkedClone mode is enabled the DiskGiB field
+                  is ignored as it is not possible to expand disks of linked clones.
+                  Defaults to LinkedClone, but fails gracefully to FullClone if the
+                  source of the clone operation has no snapshots.
+                type: string
+              datacenter:
+                description: Datacenter is the name or inventory path of the datacenter
+                  in which the virtual machine is created/located.
+                type: string
+              datastore:
+                description: Datastore is the name or inventory path of the datastore
+                  in which the virtual machine is created/located.
+                type: string
+              diskGiB:
+                description: DiskGiB is the size of a virtual machine's disk, in GiB.
+                  Defaults to the eponymous property value in the template from which
+                  the virtual machine is cloned.
+                format: int32
+                type: integer
+              folder:
+                description: Folder is the name or inventory path of the folder in
+                  which the virtual machine is created/located.
+                type: string
+              memoryMiB:
+                description: MemoryMiB is the size of a virtual machine's memory,
+                  in MiB. Defaults to the eponymous property value in the template
+                  from which the virtual machine is cloned.
+                format: int64
+                type: integer
+              network:
+                description: Network is the network configuration for this machine's
+                  VM.
+                properties:
+                  devices:
+                    description: Devices is the list of network devices used by the
+                      virtual machine. TODO(akutz) Make sure at least one network
+                      matches the             ClusterSpec.CloudProviderConfiguration.Network.Name
+                    items:
+                      description: NetworkDeviceSpec defines the network configuration
+                        for a virtual machine's network device.
+                      properties:
+                        deviceName:
+                          description: DeviceName may be used to explicitly assign
+                            a name to the network device as it exists in the guest
+                            operating system.
+                          type: string
+                        dhcp4:
+                          description: DHCP4 is a flag that indicates whether or not
+                            to use DHCP for IPv4 on this device. If true then IPAddrs
+                            should not contain any IPv4 addresses.
+                          type: boolean
+                        dhcp6:
+                          description: DHCP6 is a flag that indicates whether or not
+                            to use DHCP for IPv6 on this device. If true then IPAddrs
+                            should not contain any IPv6 addresses.
+                          type: boolean
+                        gateway4:
+                          description: Gateway4 is the IPv4 gateway used by this device.
+                            Required when DHCP4 is false.
+                          type: string
+                        gateway6:
+                          description: Gateway4 is the IPv4 gateway used by this device.
+                            Required when DHCP6 is false.
+                          type: string
+                        ipAddrs:
+                          description: IPAddrs is a list of one or more IPv4 and/or
+                            IPv6 addresses to assign to this device. Required when
+                            DHCP4 and DHCP6 are both false.
+                          items:
+                            type: string
+                          type: array
+                        macAddr:
+                          description: MACAddr is the MAC address used by this device.
+                            It is generally a good idea to omit this field and allow
+                            a MAC address to be generated. Please note that this value
+                            must use the InCloud Sphere OUI to work with the in-tree
+                            ics cloud provider.
+                          type: string
+                        mtu:
+                          description: MTU is the device’s Maximum Transmission Unit
+                            size in bytes.
+                          format: int64
+                          type: integer
+                        nameservers:
+                          description: Nameservers is a list of IPv4 and/or IPv6 addresses
+                            used as DNS nameservers. Please note that Linux allows
+                            only three nameservers (https://linux.die.net/man/5/resolv.conf).
+                          items:
+                            type: string
+                          type: array
+                        networkName:
+                          description: NetworkName is the name of the ics network
+                            to which the device will be connected.
+                          type: string
+                        routes:
+                          description: Routes is a list of optional, static routes
+                            applied to the device.
+                          items:
+                            description: NetworkRouteSpec defines a static network
+                              route.
+                            properties:
+                              metric:
+                                description: Metric is the weight/priority of the
+                                  route.
+                                format: int32
+                                type: integer
+                              to:
+                                description: To is an IPv4 or IPv6 address.
+                                type: string
+                              via:
+                                description: Via is an IPv4 or IPv6 address.
+                                type: string
+                            required:
+                            - metric
+                            - to
+                            - via
+                            type: object
+                          type: array
+                        searchDomains:
+                          description: SearchDomains is a list of search domains used
+                            when resolving IP addresses with DNS.
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - networkName
+                      type: object
+                    type: array
+                  preferredAPIServerCidr:
+                    description: PreferredAPIServeCIDR is the preferred CIDR for the
+                      Kubernetes API server endpoint on this machine
+                    type: string
+                  routes:
+                    description: Routes is a list of optional, static routes applied
+                      to the virtual machine.
+                    items:
+                      description: NetworkRouteSpec defines a static network route.
+                      properties:
+                        metric:
+                          description: Metric is the weight/priority of the route.
+                          format: int32
+                          type: integer
+                        to:
+                          description: To is an IPv4 or IPv6 address.
+                          type: string
+                        via:
+                          description: Via is an IPv4 or IPv6 address.
+                          type: string
+                      required:
+                      - metric
+                      - to
+                      - via
+                      type: object
+                    type: array
+                required:
+                - devices
+                type: object
+              numCPUs:
+                description: NumCPUs is the number of virtual processors in a virtual
+                  machine. Defaults to the eponymous property value in the template
+                  from which the virtual machine is cloned.
+                format: int32
+                type: integer
+              numCoresPerSocket:
+                description: NumCPUs is the number of cores among which to distribute
+                  CPUs in this virtual machine. Defaults to the eponymous property
+                  value in the template from which the virtual machine is cloned.
+                format: int32
+                type: integer
+              resourcePool:
+                description: ResourcePool is the name or inventory path of the resource
+                  pool in which the virtual machine is created/located.
+                type: string
+              server:
+                description: Server is the IP address or FQDN of the ics server on
+                  which the virtual machine is created/located.
+                type: string
+              snapshot:
+                description: Snapshot is the name of the snapshot from which to create
+                  a linked clone. This field is ignored if LinkedClone is not enabled.
+                  Defaults to the source's current snapshot.
+                type: string
+              template:
+                description: Template is the name or inventory path of the template
+                  used to clone the virtual machine.
+                type: string
+            required:
+            - network
+            - template
+            type: object
+          status:
+            description: ICSVMStatus defines the observed state of ICSVM
+            properties:
+              addresses:
+                description: Addresses is a list of the VM's IP addresses. This field
+                  is required at runtime for other controllers that read this CRD
+                  as unstructured data.
+                items:
+                  type: string
+                type: array
+              cloneMode:
+                description: CloneMode is the type of clone operation used to clone
+                  this VM. Since LinkedMode is the default but fails gracefully if
+                  the source of the clone has no snapshots, this field may be used
+                  to determine the actual type of clone operation used to create this
+                  VM.
+                type: string
+              failureMessage:
+                description: "FailureMessage will be set in the event that there is
+                  a terminal problem reconciling the icsvm and will contain a more
+                  verbose string suitable for logging and human consumption. \n This
+                  field should not be set for transitive errors that a controller
+                  faces that are expected to be fixed automatically over time (like
+                  service outages), but instead indicate that something is fundamentally
+                  wrong with the vm. \n Any transient errors that occur during the
+                  reconciliation of icsvms can be added as events to the icsvm object
+                  and/or logged in the controller's output."
+                type: string
+              failureReason:
+                description: "FailureReason will be set in the event that there is
+                  a terminal problem reconciling the icsvm and will contain a succinct
+                  value suitable for vm interpretation. \n This field should not be
+                  set for transitive errors that a controller faces that are expected
+                  to be fixed automatically over time (like service outages), but
+                  instead indicate that something is fundamentally wrong with the
+                  vm. \n Any transient errors that occur during the reconciliation
+                  of icsvms can be added as events to the icsvm object and/or logged
+                  in the controller's output."
+                type: string
+              network:
+                description: Network returns the network status for each of the machine's
+                  configured network interfaces.
+                items:
+                  description: NetworkStatus provides information about one of a VM's
+                    networks.
+                  properties:
+                    connected:
+                      description: Connected is a flag that indicates whether this
+                        network is currently connected to the VM.
+                      type: boolean
+                    ipAddrs:
+                      description: IPAddrs is one or more IP addresses reported by
+                        vm-tools.
+                      items:
+                        type: string
+                      type: array
+                    macAddr:
+                      description: MACAddr is the MAC address of the network device.
+                      type: string
+                    networkName:
+                      description: NetworkName is the name of the network.
+                      type: string
+                  required:
+                  - macAddr
+                  type: object
+                type: array
+              ready:
+                description: Ready is true when the provider resource is ready. This
+                  field is required at runtime for other controllers that read this
+                  CRD as unstructured data.
+                type: boolean
+              snapshot:
+                description: Snapshot is the name of the snapshot from which the VM
+                  was cloned if LinkedMode is enabled.
+                type: string
+              taskRef:
+                description: TaskRef is a managed object reference to a Task related
+                  to the machine. This value is set automatically at runtime and should
+                  not be set or modified by users.
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    cluster.x-k8s.io/provider: infrastructure-ics
+  name: capics-leader-election-role
+  namespace: capics-system
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - configmaps/status
+  verbs:
+  - get
+  - update
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  labels:
+    cluster.x-k8s.io/provider: infrastructure-ics
+  name: capics-manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cluster.x-k8s.io
+  resources:
+  - clusters
+  - clusters/status
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - cluster.x-k8s.io
+  resources:
+  - machines
+  - machines/status
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - infrastructure.cluster.x-k8s.io
+  resources:
+  - haproxyloadbalancers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - infrastructure.cluster.x-k8s.io
+  resources:
+  - haproxyloadbalancers/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - infrastructure.cluster.x-k8s.io
+  resources:
+  - icsclusters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - infrastructure.cluster.x-k8s.io
+  resources:
+  - icsclusters/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - infrastructure.cluster.x-k8s.io
+  resources:
+  - icsmachines
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - infrastructure.cluster.x-k8s.io
+  resources:
+  - icsmachines/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - infrastructure.cluster.x-k8s.io
+  resources:
+  - icsvms
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - infrastructure.cluster.x-k8s.io
+  resources:
+  - icsvms/status
+  verbs:
+  - get
+  - patch
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    cluster.x-k8s.io/provider: infrastructure-ics
+  name: capics-proxy-role
+rules:
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    cluster.x-k8s.io/provider: infrastructure-ics
+  name: capics-leader-election-rolebinding
+  namespace: capics-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: capics-leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: capics-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    cluster.x-k8s.io/provider: infrastructure-ics
+  name: capics-manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: capics-manager-role
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: capics-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    cluster.x-k8s.io/provider: infrastructure-ics
+  name: capics-proxy-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: capics-proxy-role
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: capics-system
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    cluster.x-k8s.io/provider: infrastructure-ics
+  name: capics-manager-bootstrap-credentials
+  namespace: capics-system
+stringData:
+  credentials.yaml: |-
+    username: '${ICS_USERNAME}'
+    password: '${ICS_PASSWORD}'
+type: Opaque
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    cluster.x-k8s.io/provider: infrastructure-ics
+  name: capics-webhook-service
+  namespace: capi-webhook-system
+spec:
+  ports:
+  - port: 443
+    targetPort: webhook-server
+  selector:
+    cluster.x-k8s.io/provider: infrastructure-ics
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    prometheus.io/port: "8443"
+    prometheus.io/scheme: https
+    prometheus.io/scrape: "true"
+  labels:
+    cluster.x-k8s.io/provider: infrastructure-ics
+    control-plane: controller-manager
+  name: capics-controller-manager-metrics-service
+  namespace: capics-system
+spec:
+  ports:
+  - name: https
+    port: 8443
+    targetPort: https
+  selector:
+    cluster.x-k8s.io/provider: infrastructure-ics
+    control-plane: controller-manager
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    cluster.x-k8s.io/provider: infrastructure-ics
+    control-plane: controller-manager
+  name: capics-controller-manager
+  namespace: capi-webhook-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      cluster.x-k8s.io/provider: infrastructure-ics
+      control-plane: controller-manager
+  template:
+    metadata:
+      labels:
+        cluster.x-k8s.io/provider: infrastructure-ics
+        control-plane: controller-manager
+    spec:
+      containers:
+      - args:
+        - --secure-listen-address=0.0.0.0:8443
+        - --upstream=http://127.0.0.1:8080/
+        - --logtostderr=true
+        - --v=10
+        image: gcr.io/kubebuilder/kube-rbac-proxy:v0.4.0
+        name: kube-rbac-proxy
+        ports:
+        - containerPort: 8443
+          name: https
+      - args:
+        - --metrics-addr=127.0.0.1:8080
+        - --webhook-port=9443
+        - --enable-leader-election=false
+        image: gcr.io/cluster-api-provider-ics/release/manager:v0.7.0
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: healthz
+        name: manager
+        ports:
+        - containerPort: 9443
+          name: webhook-server
+          protocol: TCP
+        - containerPort: 9440
+          name: healthz
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: healthz
+        volumeMounts:
+        - mountPath: /tmp/k8s-webhook-server/serving-certs
+          name: cert
+          readOnly: true
+      terminationGracePeriodSeconds: 10
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+      volumes:
+      - name: cert
+        secret:
+          defaultMode: 420
+          secretName: capics-webhook-service-cert
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    cluster.x-k8s.io/provider: infrastructure-ics
+    control-plane: controller-manager
+  name: capics-controller-manager
+  namespace: capics-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      cluster.x-k8s.io/provider: infrastructure-ics
+      control-plane: controller-manager
+  template:
+    metadata:
+      labels:
+        cluster.x-k8s.io/provider: infrastructure-ics
+        control-plane: controller-manager
+    spec:
+      containers:
+      - args:
+        - --secure-listen-address=0.0.0.0:8443
+        - --upstream=http://127.0.0.1:8080/
+        - --logtostderr=true
+        - --v=10
+        image: gcr.io/kubebuilder/kube-rbac-proxy:v0.4.0
+        name: kube-rbac-proxy
+        ports:
+        - containerPort: 8443
+          name: https
+      - args:
+        - --metrics-addr=127.0.0.1:8080
+        image: gcr.io/cluster-api-provider-ics/release/manager:v0.7.0
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: healthz
+        name: manager
+        ports:
+        - containerPort: 9440
+          name: healthz
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: healthz
+        volumeMounts:
+        - mountPath: /etc/capics
+          name: manager-bootstrap-credentials
+          readOnly: true
+      terminationGracePeriodSeconds: 10
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+      volumes:
+      - name: manager-bootstrap-credentials
+        secret:
+          secretName: capics-manager-bootstrap-credentials
+---
+apiVersion: cert-manager.io/v1alpha2
+kind: Certificate
+metadata:
+  labels:
+    cluster.x-k8s.io/provider: infrastructure-ics
+  name: capics-serving-cert
+  namespace: capi-webhook-system
+spec:
+  dnsNames:
+  - capics-webhook-service.capi-webhook-system.svc
+  - capics-webhook-service.capi-webhook-system.svc.cluster.local
+  issuerRef:
+    kind: Issuer
+    name: capics-selfsigned-issuer
+  secretName: capics-webhook-service-cert
+---
+apiVersion: cert-manager.io/v1alpha2
+kind: Issuer
+metadata:
+  labels:
+    cluster.x-k8s.io/provider: infrastructure-ics
+  name: capics-selfsigned-issuer
+  namespace: capi-webhook-system
+spec:
+  selfSigned: {}
