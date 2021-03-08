@@ -175,6 +175,7 @@ func Clone(ctx *context.VMContext, bootstrapData []byte) error {
 	}
 
 	ctx.Logger.Info("cloning machine", "namespace", ctx.ICSVM.Namespace, "name", ctx.ICSVM.Name, "cloneType", ctx.ICSVM.Status.CloneMode)
+	ctx.Logger.Info("@wangyongchao######VSphere Clone VM Parameter##########", "VirtualMachineCloneSpec", spec)
 	task, err := tpl.Clone(ctx, folder, ctx.ICSVM.Name, spec)
 	if err != nil {
 		return errors.Wrapf(err, "error trigging clone op for machine %s", ctx)

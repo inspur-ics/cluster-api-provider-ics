@@ -207,11 +207,13 @@ func (vms *VMService) reconcileMetadata(ctx *virtualMachineContext) (bool, error
 	if err != nil {
 		return false, err
 	}
+	ctx.Logger.Info("@wangyongchao#####VSphere VMService Metadata info#######", "existingMetadata", existingMetadata)
 
 	newMetadata, err := util.GetMachineMetadata(ctx.ICSVM.Name, *ctx.ICSVM, ctx.State.Network...)
 	if err != nil {
 		return false, err
 	}
+	ctx.Logger.Info("@wangyongchao#####VSphere VMService Metadata info#######", "newMetadata", string(newMetadata))
 
 	// If the metadata is the same then return early.
 	if string(newMetadata) == existingMetadata {
@@ -330,6 +332,7 @@ func (vms *VMService) setMetadata(ctx *virtualMachineContext, metadata []byte) (
 	if err := extraConfig.SetCloudInitMetadata(metadata); err != nil {
 		return "", errors.Wrapf(err, "unable to set metadata on vm %s", ctx)
 	}
+	ctx.Logger.Info("@wangyongchao#####VSphere VMService Update extraConfig#######", "Config", extraConfig)
 
 	task, err := ctx.Obj.Reconfigure(ctx, types.VirtualMachineConfigSpec{
 		ExtraConfig: extraConfig,
@@ -342,7 +345,7 @@ func (vms *VMService) setMetadata(ctx *virtualMachineContext, metadata []byte) (
 }
 
 func (vms *VMService) getNetworkStatus(ctx *virtualMachineContext) ([]infrav1.NetworkStatus, error) {
-	allNetStatus, err := net.GetNetworkStatus(ctx, ctx.Session.Client.Client, ctx.Ref)
+	allNetStatus, err := net.GetNetworkStatus(&ctx.VMContext, ctx.Session.Client.Client, ctx.Ref)
 	if err != nil {
 		return nil, err
 	}

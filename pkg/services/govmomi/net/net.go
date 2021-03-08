@@ -17,9 +17,11 @@ limitations under the License.
 package net
 
 import (
-	"context"
+	//"context"
 	"net"
 	"strings"
+
+	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
 
 	"github.com/pkg/errors"
 	"github.com/vmware/govmomi/property"
@@ -48,7 +50,7 @@ type NetworkStatus struct {
 
 // GetNetworkStatus returns the network information for the specified VM.
 func GetNetworkStatus(
-	ctx context.Context,
+	ctx *context.VMContext,
 	client *vim25.Client,
 	moRef types.ManagedObjectReference) ([]NetworkStatus, error) {
 
@@ -68,6 +70,7 @@ func GetNetworkStatus(
 	if obj.Config == nil {
 		return nil, errors.New("config.hardware.device is nil")
 	}
+	ctx.Logger.Info("@wangyongchao#####VSphere VM Config info#######", "VirtualMachine", obj)
 
 	var allNetStatus []NetworkStatus
 

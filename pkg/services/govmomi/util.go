@@ -178,6 +178,8 @@ func reconcileICSVMWhenNetworkIsReady(
 			if err != nil {
 				return nil, nil, errors.Wrapf(err, "failed to get mac addresses for vm %s", ctx)
 			}
+			ctx.Logger.Info("@wangyongchao#####VSphere getMacAddresses info#######", "macToDeviceIndex", macToDeviceIndex)
+			ctx.Logger.Info("@wangyongchao#####VSphere getMacAddresses info#######", "deviceToMacIndex", deviceToMacIndex)
 
 			// Wait for the IP addresses to show up for the VM.
 			chanIPAddresses, chanErrs := waitForIPAddresses(ctx, macToDeviceIndex, deviceToMacIndex)
