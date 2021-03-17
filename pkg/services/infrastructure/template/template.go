@@ -21,10 +21,11 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
+	"github.com/inspur-ics/ics-go-sdk/client/types"
+	vmapi "github.com/inspur-ics/ics-go-sdk/vm"
 	"github.com/pkg/errors"
-	"github.com/vmware/govmomi/object"
 
-	"github.com/inspur-ics/cluster-api-provider-ics/pkg/session"
+	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/infrastructure/session"
 )
 
 type tplContext interface {
@@ -34,7 +35,7 @@ type tplContext interface {
 }
 
 // FindTemplate finds a template based either on a UUID or name.
-func FindTemplate(ctx tplContext, templateID string) (*object.VirtualMachine, error) {
+func FindTemplate(ctx tplContext, templateID string) (*types.VirtualMachine, error) {
 	tpl, err := findTemplateByInstanceUUID(ctx, templateID)
 	if err != nil {
 		return nil, err
@@ -45,26 +46,28 @@ func FindTemplate(ctx tplContext, templateID string) (*object.VirtualMachine, er
 	return findTemplateByName(ctx, templateID)
 }
 
-func findTemplateByInstanceUUID(ctx tplContext, templateID string) (*object.VirtualMachine, error) {
+func findTemplateByInstanceUUID(ctx tplContext, templateID string) (*types.VirtualMachine, error) {
 	if !isValidUUID(templateID) {
 		return nil, nil
 	}
 	ctx.GetLogger().V(6).Info("find template by instance uuid", "instance-uuid", templateID)
-	ref, err := ctx.GetSession().FindByInstanceUUID(ctx, templateID)
+	virtualMachineService := vmapi.NewVirtualMachineService(ctx.GetSession().Client)
+	tpl, err := virtualMachineService.GetVMTemplateByUUID(ctx, templateID)
 	if err != nil {
 		return nil, errors.Wrap(err, "error querying template by instance UUID")
 	}
-	if ref != nil {
-		return object.NewVirtualMachine(ctx.GetSession().Client.Client, ref.Reference()), nil
+	if tpl != nil {
+		return tpl, nil
 	}
 	return nil, nil
 }
 
-func findTemplateByName(ctx tplContext, templateID string) (*object.VirtualMachine, error) {
-	ctx.GetLogger().V(6).Info("find template by name", "name", templateID)
-	tpl, err := ctx.GetSession().Finder.VirtualMachine(ctx, templateID)
+func findTemplateByName(ctx tplContext, templateName string) (*types.VirtualMachine, error) {
+	ctx.GetLogger().V(6).Info("find template by name", "name", templateName)
+	virtualMachineService := vmapi.NewVirtualMachineService(ctx.GetSession().Client)
+	tpl, err := virtualMachineService.GetVMTemplateByName(ctx, templateName)
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to find tempate by name %q", templateID)
+		return nil, errors.Wrapf(err, "unable to find tempate by name %q", templateName)
 	}
 	return tpl, nil
 }

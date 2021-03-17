@@ -14,17 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package govmomi
+package infrastructure
 
 import (
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
-	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/govmomi/esxi"
-	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/govmomi/icenter"
+	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/infrastructure/icenter"
 )
 
 func createVM(ctx *context.VMContext, bootstrapData []byte) error {
-	if ctx.Session.IsVC() {
-		return icenter.Clone(ctx, bootstrapData)
-	}
-	return esxi.Clone(ctx, bootstrapData)
+	return icenter.Clone(ctx, bootstrapData)
 }

@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package govmomi
+package infrastructure
 
 import (
 	"fmt"
 
-	"github.com/vmware/govmomi/find"
+	ics "github.com/inspur-ics/ics-go-sdk"
 )
 
 // errNotFound is returned by the findVM function when a VM is not found.
@@ -46,7 +46,7 @@ func isNotFound(err error) bool {
 
 func isVirtualMachineNotFound(err error) bool {
 	switch err.(type) {
-	case *find.NotFoundError:
+	case *ics.NotFoundError:
 		return true
 	default:
 		return false

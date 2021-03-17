@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package govmomi
+package infrastructure
 
 import (
 	"encoding/base64"
@@ -22,10 +22,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/vmware/govmomi/object"
-	"github.com/vmware/govmomi/property"
-	"github.com/vmware/govmomi/vim25/mo"
-	"github.com/vmware/govmomi/vim25/types"
+	vmapi "github.com/inspur-ics/ics-go-sdk/vm"
 	corev1 "k8s.io/api/core/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
@@ -33,8 +30,8 @@ import (
 
 	infrav1 "github.com/inspur-ics/cluster-api-provider-ics/api/v1alpha3"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
-	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/govmomi/extra"
-	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/govmomi/net"
+	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/infrastructure/extra"
+	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/infrastructure/net"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/util"
 )
 
@@ -99,7 +96,7 @@ func (vms *VMService) ReconcileVM(ctx *context.VMContext) (vm infrav1.VirtualMac
 	// Create a new virtualMachineContext to reconcile the VM.
 	vmCtx := &virtualMachineContext{
 		VMContext: *ctx,
-		Obj:       object.NewVirtualMachine(ctx.Session.Client.Client, vmRef),
+		Obj:       vmapi.NewVirtualMachineService(ctx.Session.Client),
 		Ref:       vmRef,
 		State:     &vm,
 	}
@@ -161,7 +158,7 @@ func (vms *VMService) DestroyVM(ctx *context.VMContext) (infrav1.VirtualMachine,
 	// Create a new virtualMachineContext to reconcile the VM.
 	vmCtx := &virtualMachineContext{
 		VMContext: *ctx,
-		Obj:       object.NewVirtualMachine(ctx.Session.Client.Client, vmRef),
+		Obj:       vmapi.NewVirtualMachineService(ctx.Session.Client),
 		Ref:       vmRef,
 		State:     &vm,
 	}
@@ -172,11 +169,11 @@ func (vms *VMService) DestroyVM(ctx *context.VMContext) (infrav1.VirtualMachine,
 		return vm, err
 	}
 	if powerState == infrav1.VirtualMachinePowerStatePoweredOn {
-		task, err := vmCtx.Obj.PowerOff(ctx)
+		task, err := vmCtx.Obj.PowerOffVM(ctx, vmRef.Value)
 		if err != nil {
 			return vm, err
 		}
-		ctx.ICSVM.Status.TaskRef = task.Reference().Value
+		ctx.ICSVM.Status.TaskRef = task.TaskId
 		ctx.Logger.Info("wait for VM to be powered off")
 		return vm, nil
 	}
@@ -184,11 +181,11 @@ func (vms *VMService) DestroyVM(ctx *context.VMContext) (infrav1.VirtualMachine,
 	// At this point the VM is not powered on and can be destroyed. Store the
 	// destroy task's reference and return a requeue error.
 	ctx.Logger.Info("destroying vm")
-	task, err := vmCtx.Obj.Destroy(ctx)
+	task, err := vmCtx.Obj.DeleteVM(ctx, vmRef.Value, true, true)
 	if err != nil {
 		return vm, err
 	}
-	ctx.ICSVM.Status.TaskRef = task.Reference().Value
+	ctx.ICSVM.Status.TaskRef = task.TaskId
 	ctx.Logger.Info("wait for VM to be destroyed")
 	return vm, nil
 }
@@ -207,13 +204,11 @@ func (vms *VMService) reconcileMetadata(ctx *virtualMachineContext) (bool, error
 	if err != nil {
 		return false, err
 	}
-	ctx.Logger.Info("@wangyongchao#####VSphere VMService Metadata info#######", "existingMetadata", existingMetadata)
 
 	newMetadata, err := util.GetMachineMetadata(ctx.ICSVM.Name, *ctx.ICSVM, ctx.State.Network...)
 	if err != nil {
 		return false, err
 	}
-	ctx.Logger.Info("@wangyongchao#####VSphere VMService Metadata info#######", "newMetadata", string(newMetadata))
 
 	// If the metadata is the same then return early.
 	if string(newMetadata) == existingMetadata {
@@ -239,13 +234,13 @@ func (vms *VMService) reconcilePowerState(ctx *virtualMachineContext) (bool, err
 	switch powerState {
 	case infrav1.VirtualMachinePowerStatePoweredOff:
 		ctx.Logger.Info("powering on")
-		task, err := ctx.Obj.PowerOn(ctx)
+		task, err := ctx.Obj.PowerOnVM(ctx, ctx.Ref.Value)
 		if err != nil {
 			return false, errors.Wrapf(err, "failed to trigger power on op for vm %s", ctx)
 		}
 
 		// Update the ICSVM.Status.TaskRef to track the power-on task.
-		ctx.ICSVM.Status.TaskRef = task.Reference().Value
+		ctx.ICSVM.Status.TaskRef = task.TaskId
 
 		// Once the VM is successfully powered on, a reconcile request should be
 		// triggered once the VM reports IP addresses are available.
@@ -262,59 +257,73 @@ func (vms *VMService) reconcilePowerState(ctx *virtualMachineContext) (bool, err
 }
 
 func (vms *VMService) reconcileUUID(ctx *virtualMachineContext) {
-	ctx.State.BiosUUID = ctx.Obj.UUID(ctx)
+	vm, err := ctx.Obj.GetVM(ctx, ctx.Ref.Value)
+	if err != nil {
+		return
+	}
+	ctx.State.BiosUUID = vm.UUID
 }
 
 func (vms *VMService) getPowerState(ctx *virtualMachineContext) (infrav1.VirtualMachinePowerState, error) {
-	powerState, err := ctx.Obj.PowerState(ctx)
+	vmObj, err := ctx.Obj.GetVM(ctx, ctx.Ref.Value)
 	if err != nil {
 		return "", err
 	}
 
-	switch powerState {
-	case types.VirtualMachinePowerStatePoweredOn:
+	switch vmObj.Status {
+	case "STARTED":
 		return infrav1.VirtualMachinePowerStatePoweredOn, nil
-	case types.VirtualMachinePowerStatePoweredOff:
+	case "STOPPED":
 		return infrav1.VirtualMachinePowerStatePoweredOff, nil
-	case types.VirtualMachinePowerStateSuspended:
+	case "PAUSED":
+		return infrav1.VirtualMachinePowerStateSuspended, nil
+	case "RESTARTING":
+		return infrav1.VirtualMachinePowerStateSuspended, nil
+	case "PENDING":
 		return infrav1.VirtualMachinePowerStateSuspended, nil
 	default:
-		return "", errors.Errorf("unexpected power state %q for vm %s", powerState, ctx)
+		return "", errors.Errorf("unexpected power state %q for vm %s", vmObj.Status, ctx)
 	}
 }
 
 func (vms *VMService) getMetadata(ctx *virtualMachineContext) (string, error) {
-	var (
-		obj mo.VirtualMachine
-
-		pc    = property.DefaultCollector(ctx.Session.Client.Client)
-		props = []string{"config.extraConfig"}
-	)
-
-	if err := pc.RetrieveOne(ctx, ctx.Ref, props, &obj); err != nil {
-		return "", errors.Wrapf(err, "unable to fetch props %v for vm %s", props, ctx)
+	// TODO [WYC] ADD CLOUD-INI CONFIG
+	vm, err := ctx.Obj.GetVM(ctx, ctx.Ref.Value)
+	if err != nil {
+		return "", errors.Wrapf(err, "unable to cloud init meta data for vm %s", ctx.Ref.Value)
 	}
-	if obj.Config == nil {
-		return "", nil
-	}
-
-	var metadataBase64 string
-	for _, ec := range obj.Config.ExtraConfig {
-		if optVal := ec.GetOptionValue(); optVal != nil {
-			// TODO(akutz) Using a switch instead of if in case we ever
-			//             want to check the metadata encoding as well.
-			//             Since the image stamped images always use
-			//             base64, it should be okay to not check.
-			// nolint
-			switch optVal.Key {
-			case guestInfoKeyMetadata:
-				if v, ok := optVal.Value.(string); ok {
-					metadataBase64 = v
-				}
-			}
-		}
-	}
-
+	//var (
+	//	obj types.VirtualMachine
+	//
+	//	pc    = property.DefaultCollector(ctx.Session.Client.Client)
+	//	props = []string{"config.extraConfig"}
+	//)
+	//
+	//if err := pc.RetrieveOne(ctx, ctx.Ref, props, &obj); err != nil {
+	//	return "", errors.Wrapf(err, "unable to fetch props %v for vm %s", props, ctx)
+	//}
+	//if obj.Config == nil {
+	//	return "", nil
+	//}
+	//
+	//var metadataBase64 string
+	//for _, ec := range obj.Config.ExtraConfig {
+	//	if optVal := ec.GetOptionValue(); optVal != nil {
+	//		// TODO(akutz) Using a switch instead of if in case we ever
+	//		//             want to check the metadata encoding as well.
+	//		//             Since the image stamped images always use
+	//		//             base64, it should be okay to not check.
+	//		// nolint
+	//		switch optVal.Key {
+	//		case guestInfoKeyMetadata:
+	//			if v, ok := optVal.Value.(string); ok {
+	//				metadataBase64 = v
+	//			}
+	//		}
+	//	}
+	//}
+	// TODO [WYC] ADD CLOUD-INI CONFIG
+	metadataBase64 := vm.ConfigLocation
 	if metadataBase64 == "" {
 		return "", nil
 	}
@@ -332,20 +341,24 @@ func (vms *VMService) setMetadata(ctx *virtualMachineContext, metadata []byte) (
 	if err := extraConfig.SetCloudInitMetadata(metadata); err != nil {
 		return "", errors.Wrapf(err, "unable to set metadata on vm %s", ctx)
 	}
-	ctx.Logger.Info("@wangyongchao#####VSphere VMService Update extraConfig#######", "Config", extraConfig)
+	vmObj, err := ctx.Obj.GetVM(ctx, ctx.Ref.Value)
+	if err != nil {
+		return "", errors.Wrapf(err, "unable to get vm %s", ctx.Ref.Value)
+	}
 
-	task, err := ctx.Obj.Reconfigure(ctx, types.VirtualMachineConfigSpec{
-		ExtraConfig: extraConfig,
-	})
+	// TODO [WYC] ADD CLOUD-INI CONFIG
+	vmObj.Tags = extraConfig
+
+	task, err := ctx.Obj.SetVM(ctx, *vmObj)
 	if err != nil {
 		return "", errors.Wrapf(err, "unable to set metadata on vm %s", ctx)
 	}
 
-	return task.Reference().Value, nil
+	return task.TaskId, nil
 }
 
 func (vms *VMService) getNetworkStatus(ctx *virtualMachineContext) ([]infrav1.NetworkStatus, error) {
-	allNetStatus, err := net.GetNetworkStatus(&ctx.VMContext, ctx.Session.Client.Client, ctx.Ref)
+	allNetStatus, err := net.GetNetworkStatus(&ctx.VMContext, ctx.Session.Client, ctx.Ref)
 	if err != nil {
 		return nil, err
 	}

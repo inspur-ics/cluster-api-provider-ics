@@ -19,7 +19,7 @@ package extra
 import (
 	"encoding/base64"
 
-	"github.com/vmware/govmomi/vim25/types"
+	"github.com/inspur-ics/ics-go-sdk/client/types"
 )
 
 // Config is data used with a VM's guestInfo RPC interface.

@@ -19,7 +19,7 @@ package net_test
 import (
 	"testing"
 
-	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/govmomi/net"
+	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/infrastructure/net"
 )
 
 func TestErrOnLocalOnlyIPAddr(t *testing.T) {

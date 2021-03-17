@@ -14,23 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package govmomi
+package infrastructure
 
-import (
-	"github.com/vmware/govmomi/object"
-	"github.com/vmware/govmomi/vim25/types"
-
-	infrav1 "github.com/inspur-ics/cluster-api-provider-ics/api/v1alpha3"
-	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
+const (
+	morefTypeTask = "Task"
 )
 
-type virtualMachineContext struct {
-	context.VMContext
-	Ref   types.ManagedObjectReference
-	Obj   *object.VirtualMachine
-	State *infrav1.VirtualMachine
-}
-
-func (c *virtualMachineContext) String() string {
-	return c.VMContext.String()
-}
+// nolint
+const (
+	guestInfoKeyMetadata    = "guestinfo.metadata"
+	guestInfoKeyMetadataEnc = "guestinfo.metadata.encoding"
+	guestInfoKeyUserdata    = "guestinfo.userdata"
+	guestInfoKeyUserdataEnc = "guestinfo.userdata.encoding"
+)

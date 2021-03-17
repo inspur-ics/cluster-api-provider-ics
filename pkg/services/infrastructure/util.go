@@ -14,21 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package govmomi
+package infrastructure
 
 import (
+	gocontext "context"
 	gonet "net"
-	"path"
+	"strings"
 
+	"github.com/inspur-ics/ics-go-sdk/client/types"
+	taskapi "github.com/inspur-ics/ics-go-sdk/task"
+	vmapi "github.com/inspur-ics/ics-go-sdk/vm"
 	"github.com/pkg/errors"
-	"github.com/vmware/govmomi/object"
-	"github.com/vmware/govmomi/property"
-	"github.com/vmware/govmomi/vim25/mo"
-	"github.com/vmware/govmomi/vim25/types"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
-	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/govmomi/net"
+	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/infrastructure/net"
 )
 
 func sanitizeIPAddrs(ctx *context.VMContext, ipAddrs []string) []string {
@@ -53,8 +53,9 @@ func sanitizeIPAddrs(ctx *context.VMContext, ipAddrs []string) []string {
 //   3. If it is not found by instance UUID, fallback to an inventory path search
 //      using the vm folder path and the ICSVM name
 func findVM(ctx *context.VMContext) (types.ManagedObjectReference, error) {
+	virtualMachineService := vmapi.NewVirtualMachineService(ctx.Session.Client)
 	if biosUUID := ctx.ICSVM.Spec.BiosUUID; biosUUID != "" {
-		objRef, err := ctx.Session.FindByBIOSUUID(ctx, biosUUID)
+		objRef, err := virtualMachineService.GetVMByUUID(ctx, biosUUID)
 		if err != nil {
 			return types.ManagedObjectReference{}, err
 		}
@@ -62,50 +63,55 @@ func findVM(ctx *context.VMContext) (types.ManagedObjectReference, error) {
 			ctx.Logger.Info("vm not found by bios uuid", "biosuuid", biosUUID)
 			return types.ManagedObjectReference{}, errNotFound{uuid: biosUUID}
 		}
-		ctx.Logger.Info("vm found by bios uuid", "vmref", objRef.Reference())
-		return objRef.Reference(), nil
+		reference := types.ManagedObjectReference{
+			Type: "id",
+			Value: objRef.ID,
+		}
+		ctx.Logger.Info("vm found by bios uuid", "vmref", reference)
+		return reference, nil
 	}
 
 	instanceUUID := string(ctx.ICSVM.UID)
-	objRef, err := ctx.Session.FindByInstanceUUID(ctx, instanceUUID)
+	objRef, err := virtualMachineService.GetVM(ctx, instanceUUID)
 	if err != nil {
 		return types.ManagedObjectReference{}, err
 	}
 	if objRef == nil {
-		// fallback to use inventory paths
-		folder, err := ctx.Session.Finder.FolderOrDefault(ctx, ctx.ICSVM.Spec.Folder)
-		if err != nil {
-			return types.ManagedObjectReference{}, errors.Wrapf(err, "unable to get folder for %s/%s", ctx.ICSVM.Namespace, ctx.ICSVM.Name)
-		}
-		inventoryPath := path.Join(folder.InventoryPath, ctx.ICSVM.Name)
-		ctx.Logger.Info("using inventory path to find vm", "path", inventoryPath)
-		vm, err := ctx.Session.Finder.VirtualMachine(ctx, inventoryPath)
+		vm, err := virtualMachineService.GetVMByName(ctx, ctx.ICSVM.Name)
 		if err != nil {
 			if isVirtualMachineNotFound(err) {
-				return types.ManagedObjectReference{}, errNotFound{byInventoryPath: inventoryPath}
+				return types.ManagedObjectReference{}, errNotFound{byInventoryPath: ctx.ICSVM.Name}
 			}
 			return types.ManagedObjectReference{}, err
 		}
-		ctx.Logger.Info("vm found by name", "vmref", vm.Reference())
-		return vm.Reference(), nil
+		reference := types.ManagedObjectReference{
+			Type: "id",
+			Value: vm.ID,
+		}
+		ctx.Logger.Info("vm found by name", "vmref", reference)
+		return reference, nil
 	}
-	ctx.Logger.Info("vm found by instance uuid", "vmref", objRef.Reference())
-	return objRef.Reference(), nil
+	reference := types.ManagedObjectReference{
+		Type: "id",
+		Value: objRef.ID,
+	}
+	ctx.Logger.Info("vm found by instance uuid", "vmref", reference)
+	return reference, nil
 }
 
-func getTask(ctx *context.VMContext) *mo.Task {
+func getTask(ctx *context.VMContext) *types.TaskInfo {
 	if ctx.ICSVM.Status.TaskRef == "" {
 		return nil
 	}
-	var obj mo.Task
-	moRef := types.ManagedObjectReference{
-		Type:  morefTypeTask,
-		Value: ctx.ICSVM.Status.TaskRef,
+	moRef := types.Task{
+		TaskId:  ctx.ICSVM.Status.TaskRef,
 	}
-	if err := ctx.Session.RetrieveOne(ctx, moRef, []string{"info"}, &obj); err != nil {
+	taskService := taskapi.NewTaskService(ctx.Session.Client)
+	obj, err := taskService.GetTaskInfo(ctx, &moRef)
+	if err != nil {
 		return nil
 	}
-	return &obj
+	return obj
 }
 
 func reconcileInFlightTask(ctx *context.VMContext) (bool, error) {
@@ -120,49 +126,53 @@ func reconcileInFlightTask(ctx *context.VMContext) (bool, error) {
 	}
 
 	// Otherwise the course of action is determined by the state of the task.
-	logger := ctx.Logger.WithName(task.Reference().Value)
-	logger.Info("task found", "state", task.Info.State, "description-id", task.Info.DescriptionId)
-	switch task.Info.State {
-	case types.TaskInfoStateQueued:
-		logger.Info("task is still pending", "description-id", task.Info.DescriptionId)
+	logger := ctx.Logger.WithName(task.Id)
+	logger.Info("task found", "state", task.State, "description-id", task.ProcessId)
+	switch task.State {
+	case "WAITING":
+		logger.Info("task is still pending", "description-id", task.ProcessId)
 		return true, nil
-	case types.TaskInfoStateRunning:
-		logger.Info("task is still running", "description-id", task.Info.DescriptionId)
+	case "RUNNING":
+		logger.Info("task is still running", "description-id", task.ProcessId)
 		return true, nil
-	case types.TaskInfoStateSuccess:
-		logger.Info("task is a success", "description-id", task.Info.DescriptionId)
+	case "READY":
+		logger.Info("task is still running", "description-id", task.ProcessId)
+		return true, nil
+	case "FINISHED":
+		logger.Info("task is a success", "description-id", task.ProcessId)
 		ctx.ICSVM.Status.TaskRef = ""
 		return false, nil
-	case types.TaskInfoStateError:
-		logger.Info("task failed", "description-id", task.Info.DescriptionId)
+	case "ERROR":
+		logger.Info("task failed", "description-id", task.ProcessId)
 		ctx.ICSVM.Status.TaskRef = ""
 		return false, nil
 	default:
-		return false, errors.Errorf("unknown task state %q for %q", task.Info.State, ctx)
+		return false, errors.Errorf("unknown task state %q for %q", task.State, ctx)
 	}
 }
 
 func reconcileICSVMWhenNetworkIsReady(
 	ctx *virtualMachineContext,
-	powerOnTask *object.Task) {
+	powerOnTask *types.Task) {
 
 	reconcileICSVMOnChannel(
 		&ctx.VMContext,
 		func() (<-chan []interface{}, <-chan error, error) {
 
 			// Wait for the VM to be powered on.
-			powerOnTaskInfo, err := powerOnTask.WaitForResult(ctx)
+			taskService := taskapi.NewTaskService(ctx.Session.Client)
+			powerOnTaskInfo, err := taskService.WaitForResult(ctx, powerOnTask)
 			if err != nil && powerOnTaskInfo == nil {
 				return nil, nil, errors.Wrapf(err, "failed to wait for power on op for vm %s", ctx)
 			}
-			powerState, err := ctx.Obj.PowerState(ctx)
+			vmInfo, err := ctx.Obj.GetVM(ctx, ctx.Ref.Value)
 			if err != nil {
 				return nil, nil, errors.Wrapf(err, "failed to get power state for vm %s", ctx)
 			}
-			if powerState != types.VirtualMachinePowerStatePoweredOn {
+			if strings.Compare(vmInfo.Status,"STARTED") != 0 {
 				return nil, nil, errors.Errorf(
 					"unexpected power state %v for vm %s",
-					powerState, ctx)
+					vmInfo.Status, ctx)
 			}
 
 			// Wait for all NICs to have valid MAC addresses.
@@ -178,8 +188,6 @@ func reconcileICSVMWhenNetworkIsReady(
 			if err != nil {
 				return nil, nil, errors.Wrapf(err, "failed to get mac addresses for vm %s", ctx)
 			}
-			ctx.Logger.Info("@wangyongchao#####VSphere getMacAddresses info#######", "macToDeviceIndex", macToDeviceIndex)
-			ctx.Logger.Info("@wangyongchao#####VSphere getMacAddresses info#######", "deviceToMacIndex", deviceToMacIndex)
 
 			// Wait for the IP addresses to show up for the VM.
 			chanIPAddresses, chanErrs := waitForIPAddresses(ctx, macToDeviceIndex, deviceToMacIndex)
@@ -206,22 +214,25 @@ func reconcileICSVMOnTaskCompletion(ctx *context.VMContext) {
 			"reason", "no-task")
 		return
 	}
-	taskRef := task.Reference()
-	taskHelper := object.NewTask(ctx.Session.Client.Client, taskRef)
+	taskRef := task.Id
+	taskHelper := taskapi.NewTaskService(ctx.Session.Client)
 
 	ctx.Logger.Info(
 		"enqueuing reconcile request on task completion",
 		"task-ref", taskRef,
-		"task-name", task.Info.Name,
-		"task-entity-name", task.Info.EntityName,
-		"task-description-id", task.Info.DescriptionId)
+		"task-name", task.Name,
+		"task-entity-name", task.TargetName,
+		"task-description-id", task.ProcessId)
 
 	reconcileICSVMOnFuncCompletion(ctx, func() ([]interface{}, error) {
-		taskInfo, err := taskHelper.WaitForResult(ctx)
+		ref := types.Task{
+			TaskId: taskRef,
+		}
+		taskInfo, err := taskHelper.WaitForResult(ctx, &ref)
 
 		// An error is only returned if the process of waiting for the result
 		// failed, *not* if the task itself failed.
-		if err != nil && taskInfo == nil {
+		if err != nil {
 			return nil, err
 		}
 
@@ -229,9 +240,9 @@ func reconcileICSVMOnTaskCompletion(ctx *context.VMContext) {
 			"reason", "task",
 			"task-ref", taskRef,
 			"task-name", taskInfo.Name,
-			"task-entity-name", taskInfo.EntityName,
+			"task-entity-name", taskInfo.TargetName,
 			"task-state", taskInfo.State,
-			"task-description-id", taskInfo.DescriptionId,
+			"task-description-id", taskInfo.ProcessId,
 		}, nil
 	})
 }
@@ -310,22 +321,12 @@ func reconcileICSVMOnChannel(
 // waitForMacAddresses waits for all configured network devices to have
 // valid MAC addresses.
 func waitForMacAddresses(ctx *virtualMachineContext) error {
-	return property.Wait(
-		ctx, property.DefaultCollector(ctx.Session.Client.Client),
-		ctx.Obj.Reference(), []string{"config.hardware.device"},
-		func(propertyChanges []types.PropertyChange) bool {
-			for _, propChange := range propertyChanges {
-				if propChange.Op != types.PropertyChangeOpAssign {
-					continue
-				}
-				deviceList := object.VirtualDeviceList(propChange.Val.(types.ArrayOfVirtualDevice).VirtualDevice)
-				for _, dev := range deviceList {
-					if nic, ok := dev.(types.BaseVirtualEthernetCard); ok {
-						mac := nic.GetVirtualEthernetCard().MacAddress
-						if mac == "" {
-							return false
-						}
-					}
+	return Wait(ctx, vmapi.NewVirtualMachineService(ctx.Session.Client),
+		ctx.Ref, func(nicChanges []types.Nic) bool {
+			for _, nic := range nicChanges {
+				mac := nic.Mac
+				if mac == "" {
+					return false
 				}
 			}
 			return true
@@ -338,23 +339,23 @@ func waitForMacAddresses(ctx *virtualMachineContext) error {
 // noticed.
 func getMacAddresses(ctx *virtualMachineContext) ([]string, map[string]int, map[int]string, error) {
 	var (
-		vm                   mo.VirtualMachine
+		vm                   types.VirtualMachine
 		macAddresses         []string
 		macToDeviceSpecIndex = map[string]int{}
 		deviceSpecIndexToMac = map[int]string{}
 	)
-	if err := ctx.Obj.Properties(ctx, ctx.Obj.Reference(), []string{"config.hardware.device"}, &vm); err != nil {
+	vmInfo, err := ctx.Obj.GetVM(ctx, ctx.Ref.Value)
+	if err != nil {
 		return nil, nil, nil, err
 	}
+	vm = *vmInfo
 	i := 0
-	for _, device := range vm.Config.Hardware.Device {
-		if nic, ok := device.(types.BaseVirtualEthernetCard); ok {
-			mac := nic.GetVirtualEthernetCard().MacAddress
-			macAddresses = append(macAddresses, mac)
-			macToDeviceSpecIndex[mac] = i
-			deviceSpecIndexToMac[i] = mac
-			i++
-		}
+	for _, device := range vm.Nics {
+		mac := device.Mac
+		macAddresses = append(macAddresses, mac)
+		macToDeviceSpecIndex[mac] = i
+		deviceSpecIndexToMac[i] = mac
+		i++
 	}
 	return macAddresses, macToDeviceSpecIndex, deviceSpecIndexToMac, nil
 }
@@ -378,7 +379,7 @@ func waitForIPAddresses(
 		macToHasIPv6Lease = map[string]struct{}{}
 		macToSkipped      = map[string]map[string]struct{}{}
 		macToHasStaticIP  = map[string]map[string]struct{}{}
-		propCollector     = property.DefaultCollector(ctx.Session.Client.Client)
+		virtualMachineService     = vmapi.NewVirtualMachineService(ctx.Session.Client)
 	)
 
 	// Initialize the nested maps early.
@@ -387,100 +388,92 @@ func waitForIPAddresses(
 		macToHasStaticIP[mac] = map[string]struct{}{}
 	}
 
-	onPropertyChange := func(propertyChanges []types.PropertyChange) bool {
-		for _, propChange := range propertyChanges {
-			if propChange.Op != types.PropertyChangeOpAssign {
+	onNicChange := func(nicChanges []types.Nic) bool {
+		for _, nic := range nicChanges {
+			mac := nic.Mac
+			if mac == "" || nic.IP == "" {
 				continue
 			}
-			nics := propChange.Val.(types.ArrayOfGuestNicInfo).GuestNicInfo
-			for _, nic := range nics {
-				mac := nic.MacAddress
-				if mac == "" || nic.IpConfig == nil {
-					continue
-				}
-				// Ignore any that don't correspond to a network
-				// device spec.
-				deviceSpecIndex, ok := macToDeviceIndex[mac]
-				if !ok {
-					chanErrs <- errors.Errorf("unknown device spec index for mac %s while waiting for ip addresses for vm %s", mac, ctx)
-					// Return true to stop the property collector from waiting
-					// on any more changes.
-					return true
-				}
-				if deviceSpecIndex < 0 || deviceSpecIndex >= len(ctx.ICSVM.Spec.Network.Devices) {
-					chanErrs <- errors.Errorf("invalid device spec index %d for mac %s while waiting for ip addresses for vm %s", deviceSpecIndex, mac, ctx)
-					// Return true to stop the property collector from waiting
-					// on any more changes.
-					return true
-				}
+			// Ignore any that don't correspond to a network
+			// device spec.
+			deviceSpecIndex, ok := macToDeviceIndex[mac]
+			if !ok {
+				chanErrs <- errors.Errorf("unknown device spec index for mac %s while waiting for ip addresses for vm %s", mac, ctx)
+				// Return true to stop the property collector from waiting
+				// on any more changes.
+				return true
+			}
+			if deviceSpecIndex < 0 || deviceSpecIndex >= len(ctx.ICSVM.Spec.Network.Devices) {
+				chanErrs <- errors.Errorf("invalid device spec index %d for mac %s while waiting for ip addresses for vm %s", deviceSpecIndex, mac, ctx)
+				// Return true to stop the property collector from waiting
+				// on any more changes.
+				return true
+			}
 
-				// Get the network device spec that corresponds to the MAC.
-				deviceSpec := ctx.ICSVM.Spec.Network.Devices[deviceSpecIndex]
+			// Get the network device spec that corresponds to the MAC.
+			deviceSpec := ctx.ICSVM.Spec.Network.Devices[deviceSpecIndex]
 
-				// Look at each IP and determine whether or not a reconcile has
-				// been triggered for the IP.
-				for _, discoveredIPInfo := range nic.IpConfig.IpAddress {
-					discoveredIP := discoveredIPInfo.IpAddress
+			// Look at each IP and determine whether or not a reconcile has
+			// been triggered for the IP.
+			discoveredIP := nic.IP
 
-					// Ignore link-local addresses.
-					if err := net.ErrOnLocalOnlyIPAddr(discoveredIP); err != nil {
-						if _, ok := macToSkipped[mac][discoveredIP]; !ok {
-							ctx.Logger.Info("ignoring IP address", "reason", err.Error())
-							macToSkipped[mac][discoveredIP] = struct{}{}
-						}
-						continue
+			// Ignore link-local addresses.
+			if err := net.ErrOnLocalOnlyIPAddr(discoveredIP); err != nil {
+				if _, ok := macToSkipped[mac][discoveredIP]; !ok {
+					ctx.Logger.Info("ignoring IP address", "reason", err.Error())
+					macToSkipped[mac][discoveredIP] = struct{}{}
+				}
+				continue
+			}
+
+			// Check to see if the IP is in the list of the device
+			// spec's static IP addresses.
+			isStatic := false
+			for _, specIP := range deviceSpec.IPAddrs {
+				if discoveredIP == specIP {
+					isStatic = true
+					break
+				}
+			}
+
+			// If it's a static IP then check to see if the IP has
+			// triggered a reconcile yet.
+			switch {
+			case isStatic:
+				if _, ok := macToHasStaticIP[mac][discoveredIP]; !ok {
+					// No reconcile yet. Record the IP send it to the
+					// channel.
+					ctx.Logger.Info(
+						"discovered IP address",
+						"addressType", "static",
+						"addressValue", discoveredIP)
+					macToHasStaticIP[mac][discoveredIP] = struct{}{}
+					chanIPAddresses <- discoveredIP
+				}
+			case gonet.ParseIP(discoveredIP).To4() != nil:
+				// An IPv4 address...
+				if deviceSpec.DHCP4 {
+					// Has an IPv4 lease been discovered yet?
+					if _, ok := macToHasIPv4Lease[mac]; !ok {
+						ctx.Logger.Info(
+							"discovered IP address",
+							"addressType", "dhcp4",
+							"addressValue", discoveredIP)
+						macToHasIPv4Lease[mac] = struct{}{}
+						chanIPAddresses <- discoveredIP
 					}
-
-					// Check to see if the IP is in the list of the device
-					// spec's static IP addresses.
-					isStatic := false
-					for _, specIP := range deviceSpec.IPAddrs {
-						if discoveredIP == specIP {
-							isStatic = true
-							break
-						}
-					}
-
-					// If it's a static IP then check to see if the IP has
-					// triggered a reconcile yet.
-					switch {
-					case isStatic:
-						if _, ok := macToHasStaticIP[mac][discoveredIP]; !ok {
-							// No reconcile yet. Record the IP send it to the
-							// channel.
-							ctx.Logger.Info(
-								"discovered IP address",
-								"addressType", "static",
-								"addressValue", discoveredIP)
-							macToHasStaticIP[mac][discoveredIP] = struct{}{}
-							chanIPAddresses <- discoveredIP
-						}
-					case gonet.ParseIP(discoveredIP).To4() != nil:
-						// An IPv4 address...
-						if deviceSpec.DHCP4 {
-							// Has an IPv4 lease been discovered yet?
-							if _, ok := macToHasIPv4Lease[mac]; !ok {
-								ctx.Logger.Info(
-									"discovered IP address",
-									"addressType", "dhcp4",
-									"addressValue", discoveredIP)
-								macToHasIPv4Lease[mac] = struct{}{}
-								chanIPAddresses <- discoveredIP
-							}
-						}
-					default:
-						// An IPv6 address..
-						if deviceSpec.DHCP6 {
-							// Has an IPv6 lease been discovered yet?
-							if _, ok := macToHasIPv6Lease[mac]; !ok {
-								ctx.Logger.Info(
-									"discovered IP address",
-									"addressType", "dhcp6",
-									"addressValue", discoveredIP)
-								macToHasIPv6Lease[mac] = struct{}{}
-								chanIPAddresses <- discoveredIP
-							}
-						}
+				}
+			default:
+				// An IPv6 address..
+				if deviceSpec.DHCP6 {
+					// Has an IPv6 lease been discovered yet?
+					if _, ok := macToHasIPv6Lease[mac]; !ok {
+						ctx.Logger.Info(
+							"discovered IP address",
+							"addressType", "dhcp6",
+							"addressValue", discoveredIP)
+						macToHasIPv6Lease[mac] = struct{}{}
+						chanIPAddresses <- discoveredIP
 					}
 				}
 			}
@@ -539,9 +532,8 @@ func waitForIPAddresses(
 	// network devie specs. However, every time a new IP is discovered,
 	// a reconcile request will be triggered for the ICSVM.
 	go func() {
-		if err := property.Wait(
-			ctx, propCollector, ctx.Obj.Reference(),
-			[]string{"guest.net"}, onPropertyChange); err != nil {
+		if err := Wait(ctx, virtualMachineService, ctx.Ref,
+			onNicChange); err != nil {
 
 			chanErrs <- errors.Wrapf(err, "failed to wait for ip addresses for vm %s", ctx)
 		}
@@ -550,4 +542,36 @@ func waitForIPAddresses(
 	}()
 
 	return chanIPAddresses, chanErrs
+}
+
+func Wait(ctx gocontext.Context, c *vmapi.VirtualMachineService, obj types.ManagedObjectReference, f func([]types.Nic) bool) error {
+	return WaitForUpdates(ctx, c, obj, func(updates []types.Nic) bool {
+		if f(updates) {
+			return true
+		}
+		return false
+	})
+}
+
+func WaitForUpdates(ctx gocontext.Context, c *vmapi.VirtualMachineService, obj types.ManagedObjectReference, f func([]types.Nic) bool) error {
+	_, err := c.GetVM(ctx, obj.Value)
+	if err != nil {
+		return err
+	}
+
+	for {
+		vmInfo, err := c.GetVM(ctx, obj.Value)
+		if err != nil {
+			return err
+		}
+
+		if vmInfo == nil {
+			// Retry if the result came back empty
+			continue
+		}
+
+		if f(vmInfo.Nics) {
+			return nil
+		}
+	}
 }

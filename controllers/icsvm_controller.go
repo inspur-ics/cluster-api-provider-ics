@@ -47,8 +47,8 @@ import (
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/record"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services"
-	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/govmomi"
-	"github.com/inspur-ics/cluster-api-provider-ics/pkg/session"
+	infrast "github.com/inspur-ics/cluster-api-provider-ics/pkg/services/infrastructure"
+	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/infrastructure/session"
 )
 
 // +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=icsvms,verbs=get;list;watch;create;update;patch;delete
@@ -275,8 +275,8 @@ func (r vmReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result, reterr error) 
 func (r vmReconciler) reconcileDelete(ctx *context.VMContext) (reconcile.Result, error) {
 	ctx.Logger.Info("Handling deleted ICSVM")
 
-	// TODO(akutz) Implement selection of VM service based on ics version
-	var vmService services.VirtualMachineService = &govmomi.VMService{}
+	//Implement selection of VM service based on ics version
+	var vmService services.VirtualMachineService = &infrast.VMService{}
 
 	vm, err := vmService.DestroyVM(ctx)
 	if err != nil {
@@ -304,8 +304,8 @@ func (r vmReconciler) reconcileNormal(ctx *context.VMContext) (reconcile.Result,
 	// If the ICSVM doesn't have our finalizer, add it.
 	ctrlutil.AddFinalizer(ctx.ICSVM, infrav1.VMFinalizer)
 
-	// TODO(akutz) Implement selection of VM service based on ics version
-	var vmService services.VirtualMachineService = &govmomi.VMService{}
+	//Implement selection of VM service based on ics version
+	var vmService services.VirtualMachineService = &infrast.VMService{}
 
 	// Get or create the VM.
 	vm, err := vmService.ReconcileVM(ctx)
