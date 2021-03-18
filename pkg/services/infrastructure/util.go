@@ -51,7 +51,7 @@ func sanitizeIPAddrs(ctx *context.VMContext, ipAddrs []string) []string {
 //   2. Lacking the BIOS UUID, the VM is queried by its instance UUID,
 //      which was assigned the value of the ICSVM resource's UID string.
 //   3. If it is not found by instance UUID, fallback to an inventory path search
-//      using the vm folder path and the ICSVM name
+//      using the vm cluster path and the ICSVM name
 func findVM(ctx *context.VMContext) (types.ManagedObjectReference, error) {
 	virtualMachineService := vmapi.NewVirtualMachineService(ctx.Session.Client)
 	if biosUUID := ctx.ICSVM.Spec.BiosUUID; biosUUID != "" {

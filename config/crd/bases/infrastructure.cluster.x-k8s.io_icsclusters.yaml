@@ -212,8 +212,8 @@ spec:
                       datastore:
                         description: Datastore is the datastore in which VMs are created/located.
                         type: string
-                      folder:
-                        description: Folder is the folder in which VMs are created/located.
+                      cluster:
+                        description: Cluster is the cluster in which VMs are created/located.
                         type: string
                       resourcePool:
                         description: ResourcePool is the resource pool in which VMs

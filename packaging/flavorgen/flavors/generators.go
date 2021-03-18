@@ -41,7 +41,7 @@ const (
 	namespaceVar                = "${ NAMESPACE }"
 	icsDataCenterVar            = "${ ICS_DATACENTER }"
 	icsDatastoreVar             = "${ ICS_DATASTORE }"
-	icsFolderVar                = "${ ICS_FOLDER }"
+	icsClusterVar                = "${ ICS_CLUSTER }"
 	icsHaproxyTemplateVar       = "${ ICS_HAPROXY_TEMPLATE }"
 	icsNetworkVar               = "${ ICS_NETWORK }"
 	icsResourcePoolVar          = "${ ICS_RESOURCE_POOL }"
@@ -85,7 +85,7 @@ var (
 		regexVar(clusterNameVar + machineDeploymentNameSuffix),
 		regexVar(namespaceVar),
 		regexVar(kubernetesVersionVar),
-		regexVar(icsFolderVar),
+		regexVar(icsClusterVar),
 		regexVar(icsHaproxyTemplateVar),
 		regexVar(icsResourcePoolVar),
 		regexVar(icsSSHAuthorizedKeysVar),
@@ -131,7 +131,7 @@ func newICSCluster(lb *infrav1.HAProxyLoadBalancer) infrav1.ICSCluster {
 					Datacenter:   icsDataCenterVar,
 					Datastore:    icsDatastoreVar,
 					ResourcePool: icsResourcePoolVar,
-					Folder:       icsFolderVar,
+					Cluster:       icsClusterVar,
 				},
 				ProviderConfig: infrav1.CPIProviderConfig{
 					Cloud: &infrav1.CPICloudConfig{
@@ -241,7 +241,7 @@ func defaultVirtualMachineCloneSpec() infrav1.VirtualMachineCloneSpec {
 		Server:       icsServerVar,
 		ResourcePool: icsResourcePoolVar,
 		Datastore:    icsDatastoreVar,
-		Folder:       icsFolderVar,
+		Cluster:       icsClusterVar,
 	}
 }
 

@@ -35,7 +35,7 @@ spec:
     datacenter: '${ ICS_DATACENTER }'
     datastore: '${ ICS_DATASTORE }'
     diskGiB: 25
-    folder: '${ ICS_FOLDER }'
+    cluster: '${ ICS_CLUSTER }'
     memoryMiB: 8192
     network:
       devices:
@@ -76,7 +76,7 @@ spec:
     workspace:
       datacenter: '${ ICS_DATACENTER }'
       datastore: '${ ICS_DATASTORE }'
-      folder: '${ ICS_FOLDER }'
+      cluster: '${ ICS_CLUSTER }'
       resourcePool: '${ ICS_RESOURCE_POOL }'
       server: '${ ICS_SERVER }'
   loadBalancerRef:
@@ -97,7 +97,7 @@ spec:
       datacenter: '${ ICS_DATACENTER }'
       datastore: '${ ICS_DATASTORE }'
       diskGiB: 25
-      folder: '${ ICS_FOLDER }'
+      cluster: '${ ICS_CLUSTER }'
       memoryMiB: 8192
       network:
         devices:

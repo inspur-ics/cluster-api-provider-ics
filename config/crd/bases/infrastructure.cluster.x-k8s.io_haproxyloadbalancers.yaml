@@ -81,8 +81,8 @@ spec:
                       from which the virtual machine is cloned.
                     format: int32
                     type: integer
-                  folder:
-                    description: Folder is the name or inventory path of the folder
+                  cluster:
+                    description: Cluster is the name or inventory path of the cluster
                       in which the virtual machine is created/located.
                     type: string
                   memoryMiB:

@@ -226,9 +226,9 @@ type CPIWorkspaceConfig struct {
 	// +optional
 	Datacenter string `gcfg:"datacenter,omitempty" json:"datacenter,omitempty"`
 
-	// Folder is the folder in which VMs are created/located.
+	// Cluster is the cluster in which VMs are created/located.
 	// +optional
-	Folder string `gcfg:"folder,omitempty" json:"folder,omitempty"`
+	Cluster string `gcfg:"cluster,omitempty" json:"cluster,omitempty"`
 
 	// Datastore is the datastore in which VMs are created/located.
 	// +optional

@@ -82,10 +82,10 @@ type VirtualMachineCloneSpec struct {
 	// +optional
 	Datacenter string `json:"datacenter,omitempty"`
 
-	// Folder is the name or inventory path of the folder in which the
+	// Cluster is the name or inventory path of the cluster in which the
 	// virtual machine is created/located.
 	// +optional
-	Folder string `json:"folder,omitempty"`
+	Cluster string `json:"cluster,omitempty"`
 
 	// Datastore is the name or inventory path of the datastore in which the
 	// virtual machine is created/located.

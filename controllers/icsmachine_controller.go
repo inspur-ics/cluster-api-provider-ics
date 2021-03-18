@@ -434,8 +434,8 @@ func (r machineReconciler) reconcileNormalPre7(ctx *context.MachineContext, icsV
 		if vm.Spec.Datastore == "" {
 			vm.Spec.Datastore = icsCloudConfig.Datastore
 		}
-		if vm.Spec.Folder == "" {
-			vm.Spec.Folder = icsCloudConfig.Folder
+		if vm.Spec.Cluster == "" {
+			vm.Spec.Cluster = icsCloudConfig.Cluster
 		}
 		if vm.Spec.ResourcePool == "" {
 			vm.Spec.ResourcePool = icsCloudConfig.ResourcePool
