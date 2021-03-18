@@ -14,27 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package docker
+package infrastructure
 
 import (
-	"context"
-	"fmt"
+	"github.com/inspur-ics/ics-go-sdk/client/types"
+	"github.com/inspur-ics/ics-go-sdk/vm"
 
-	"sigs.k8s.io/cluster-api/test/framework/exec"
+	infrav1 "github.com/inspur-ics/cluster-api-provider-ics/api/v1alpha3"
+	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
 )
 
-// Pull pulls a container image.
-func Pull(ctx context.Context, imageName string) error {
-	pullCmd := exec.NewCommand(
-		exec.WithCommand("docker"),
-		exec.WithArgs("pull", imageName),
-	)
-	stdout, stderr, err := pullCmd.Run(ctx)
-	if err != nil {
-		fmt.Println(string(stdout))
-		fmt.Println(string(stderr))
-		return err
-	}
-	fmt.Println(string(stdout))
-	return nil
+type virtualMachineContext struct {
+	context.VMContext
+	Ref   types.ManagedObjectReference
+	Obj   *vm.VirtualMachineService
+	State *infrav1.VirtualMachine
+}
+
+func (c *virtualMachineContext) String() string {
+	return c.VMContext.String()
 }

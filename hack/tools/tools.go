@@ -21,8 +21,8 @@ package tools
 
 import (
 	_ "github.com/golangci/golangci-lint/cmd/golangci-lint"
+	_ "github.com/inspur-ics/ics-go-sdk"
 	_ "github.com/onsi/ginkgo/ginkgo"
-	_ "github.com/vmware/govmomi"
 	_ "k8s.io/code-generator/cmd/conversion-gen"
 	_ "sigs.k8s.io/controller-tools/cmd/controller-gen"
 	_ "sigs.k8s.io/kind"

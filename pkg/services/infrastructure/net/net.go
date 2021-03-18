@@ -17,17 +17,15 @@ limitations under the License.
 package net
 
 import (
-	//"context"
 	"net"
 	"strings"
 
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
 
+	"github.com/inspur-ics/ics-go-sdk/client"
+	"github.com/inspur-ics/ics-go-sdk/client/types"
+	vmapi "github.com/inspur-ics/ics-go-sdk/vm"
 	"github.com/pkg/errors"
-	"github.com/vmware/govmomi/property"
-	"github.com/vmware/govmomi/vim25"
-	"github.com/vmware/govmomi/vim25/mo"
-	"github.com/vmware/govmomi/vim25/types"
 )
 
 // NetworkStatus provides information about one of a VM's networks.
@@ -51,42 +49,36 @@ type NetworkStatus struct {
 // GetNetworkStatus returns the network information for the specified VM.
 func GetNetworkStatus(
 	ctx *context.VMContext,
-	client *vim25.Client,
+	client *client.Client,
 	moRef types.ManagedObjectReference) ([]NetworkStatus, error) {
 
 	var (
-		obj mo.VirtualMachine
-
-		pc    = property.DefaultCollector(client)
-		props = []string{
-			"config.hardware.device",
-			"guest.net",
-		}
+		obj types.VirtualMachine
 	)
 
-	if err := pc.RetrieveOne(ctx, moRef, props, &obj); err != nil {
-		return nil, errors.Wrapf(err, "unable to fetch props %v for vm %v", props, moRef)
+	virtualMachineService := vmapi.NewVirtualMachineService(client)
+	vm, err := virtualMachineService.GetVM(ctx, moRef.Value)
+	if err != nil {
+		return nil, errors.Wrapf(err, "unable to get vm info, for vm %v", moRef)
 	}
-	if obj.Config == nil {
-		return nil, errors.New("config.hardware.device is nil")
+	obj = *vm
+	if obj.Nics == nil || len(obj.Nics) <= 0 {
+		return nil, errors.New("vm nics hardware device is nil")
 	}
-	ctx.Logger.Info("@wangyongchao#####VSphere VM Config info#######", "VirtualMachine", obj)
 
 	var allNetStatus []NetworkStatus
 
-	for _, device := range obj.Config.Hardware.Device {
-		if dev, ok := device.(types.BaseVirtualEthernetCard); ok {
-			nic := dev.GetVirtualEthernetCard()
+	for _, nic := range obj.Nics {
+		if len(nic.ID) != 0 {
 			netStatus := NetworkStatus{
-				MACAddr: nic.MacAddress,
+				MACAddr: nic.Mac,
 			}
-			if obj.Guest != nil {
-				for _, i := range obj.Guest.Net {
-					if strings.EqualFold(nic.MacAddress, i.MacAddress) {
-						netStatus.IPAddrs = i.IpAddress
-						netStatus.NetworkName = i.Network
-						netStatus.Connected = i.Connected
-					}
+			if len(nic.IP) != 0 {
+				netStatus.IPAddrs = []string{ nic.IP }
+				netStatus.NetworkName = nic.DeviceName
+				netStatus.Connected = false
+				if strings.Compare("UP", nic.Status) == 0 {
+					netStatus.Connected = true
 				}
 			}
 			allNetStatus = append(allNetStatus, netStatus)
