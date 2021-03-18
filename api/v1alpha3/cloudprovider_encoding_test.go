@@ -57,7 +57,7 @@ cluster-id = "cluster-namespace/cluster-name"
 [Workspace]
 server = "0.0.0.0"
 datacenter = "us-west"
-folder = "kubernetes"
+cluster = "kubernetes"
 default-datastore = "default"
 
 `,
@@ -74,7 +74,7 @@ default-datastore = "default"
 				Workspace: v1alpha3.CPIWorkspaceConfig{
 					Server:     "0.0.0.0",
 					Datacenter: "us-west",
-					Folder:     "kubernetes",
+					Cluster:     "kubernetes",
 					Datastore:  "default",
 				},
 			},
@@ -93,7 +93,7 @@ password = "password"
 [Workspace]
 server = "0.0.0.0"
 datacenter = "us-west"
-folder = "kubernetes"
+cluster = "kubernetes"
 
 `,
 			configObj: v1alpha3.CPIConfig{
@@ -111,7 +111,7 @@ folder = "kubernetes"
 				Workspace: v1alpha3.CPIWorkspaceConfig{
 					Server:     "0.0.0.0",
 					Datacenter: "us-west",
-					Folder:     "kubernetes",
+					Cluster:     "kubernetes",
 				},
 			},
 		},
@@ -127,7 +127,7 @@ datacenters = "us-west"
 [Workspace]
 server = "0.0.0.0"
 datacenter = "us-west"
-folder = "kubernetes"
+cluster = "kubernetes"
 
 `,
 			configObj: v1alpha3.CPIConfig{
@@ -142,7 +142,7 @@ folder = "kubernetes"
 				Workspace: v1alpha3.CPIWorkspaceConfig{
 					Server:     "0.0.0.0",
 					Datacenter: "us-west",
-					Folder:     "kubernetes",
+					Cluster:     "kubernetes",
 				},
 			},
 		},
@@ -161,7 +161,7 @@ password = "password"
 [Workspace]
 server = "0.0.0.0"
 datacenter = "us-west"
-folder = "kubernetes"
+cluster = "kubernetes"
 
 `,
 			configObj: v1alpha3.CPIConfig{
@@ -180,7 +180,7 @@ folder = "kubernetes"
 				Workspace: v1alpha3.CPIWorkspaceConfig{
 					Server:     "0.0.0.0",
 					Datacenter: "us-west",
-					Folder:     "kubernetes",
+					Cluster:     "kubernetes",
 				},
 			},
 		},
@@ -202,7 +202,7 @@ thumbprint = "thumbprint:1"
 [Workspace]
 server = "0.0.0.0"
 datacenter = "us-west"
-folder = "kubernetes"
+cluster = "kubernetes"
 
 `,
 			configObj: v1alpha3.CPIConfig{
@@ -223,7 +223,7 @@ folder = "kubernetes"
 				Workspace: v1alpha3.CPIWorkspaceConfig{
 					Server:     "0.0.0.0",
 					Datacenter: "us-west",
-					Folder:     "kubernetes",
+					Cluster:     "kubernetes",
 				},
 			},
 		},
@@ -242,7 +242,7 @@ datacenters = "us-west"
 [Workspace]
 server = "0.0.0.0"
 datacenter = "us-west"
-folder = "kubernetes"
+cluster = "kubernetes"
 
 `,
 			configObj: v1alpha3.CPIConfig{
@@ -259,7 +259,7 @@ folder = "kubernetes"
 				Workspace: v1alpha3.CPIWorkspaceConfig{
 					Server:     "0.0.0.0",
 					Datacenter: "us-west",
-					Folder:     "kubernetes",
+					Cluster:     "kubernetes",
 				},
 				ProviderConfig: v1alpha3.CPIProviderConfig{
 					Cloud: &v1alpha3.CPICloudConfig{
@@ -368,7 +368,7 @@ func TestUnmarshalINI(t *testing.T) {
 		[Workspace]
 		server = "0.0.0.0"
 		datacenter = "us-west"
-		folder = "kubernetes"
+		cluster = "kubernetes"
 		default-datastore = "default"
 		`,
 			configObj: v1alpha3.CPIConfig{
@@ -384,7 +384,7 @@ func TestUnmarshalINI(t *testing.T) {
 				Workspace: v1alpha3.CPIWorkspaceConfig{
 					Server:     "0.0.0.0",
 					Datacenter: "us-west",
-					Folder:     "kubernetes",
+					Cluster:     "kubernetes",
 					Datastore:  "default",
 				},
 			},
@@ -404,7 +404,7 @@ func TestUnmarshalINI(t *testing.T) {
 		[Workspace]
 		server = 0.0.0.0
 		datacenter = "us-west"
-		folder = "kubernetes"
+		cluster = "kubernetes"
 		`,
 			configObj: v1alpha3.CPIConfig{
 				Global: v1alpha3.CPIGlobalConfig{
@@ -421,7 +421,7 @@ func TestUnmarshalINI(t *testing.T) {
 				Workspace: v1alpha3.CPIWorkspaceConfig{
 					Server:     "0.0.0.0",
 					Datacenter: "us-west",
-					Folder:     "kubernetes",
+					Cluster:     "kubernetes",
 				},
 			},
 		},
@@ -440,7 +440,7 @@ func TestUnmarshalINI(t *testing.T) {
 		[Workspace]
 		server = 0.0.0.0
 		datacenter = "us-west"
-		folder = "kubernetes"
+		cluster = "kubernetes"
 		`,
 			configObj: v1alpha3.CPIConfig{
 				Global: v1alpha3.CPIGlobalConfig{
@@ -457,7 +457,7 @@ func TestUnmarshalINI(t *testing.T) {
 				Workspace: v1alpha3.CPIWorkspaceConfig{
 					Server:     "0.0.0.0",
 					Datacenter: "us-west",
-					Folder:     "kubernetes",
+					Cluster:     "kubernetes",
 				},
 			},
 		},
@@ -474,7 +474,7 @@ func TestUnmarshalINI(t *testing.T) {
 		[Workspace]
 		server = "0.0.0.0"
 		datacenter = "us-west"
-		folder = "kubernetes"
+		cluster = "kubernetes"
 		`,
 			configObj: v1alpha3.CPIConfig{
 				Global: v1alpha3.CPIGlobalConfig{
@@ -488,7 +488,7 @@ func TestUnmarshalINI(t *testing.T) {
 				Workspace: v1alpha3.CPIWorkspaceConfig{
 					Server:     "0.0.0.0",
 					Datacenter: "us-west",
-					Folder:     "kubernetes",
+					Cluster:     "kubernetes",
 				},
 			},
 		},
@@ -508,7 +508,7 @@ func TestUnmarshalINI(t *testing.T) {
 		[Workspace]
 		server = "0.0.0.0"
 		datacenter = "us-west"
-		folder = "kubernetes"
+		cluster = "kubernetes"
 		`,
 			configObj: v1alpha3.CPIConfig{
 				Global: v1alpha3.CPIGlobalConfig{
@@ -526,7 +526,7 @@ func TestUnmarshalINI(t *testing.T) {
 				Workspace: v1alpha3.CPIWorkspaceConfig{
 					Server:     "0.0.0.0",
 					Datacenter: "us-west",
-					Folder:     "kubernetes",
+					Cluster:     "kubernetes",
 				},
 			},
 		},
@@ -549,7 +549,7 @@ func TestUnmarshalINI(t *testing.T) {
 		[Workspace]
 		server = "0.0.0.0"
 		datacenter = "us-west"
-		folder = "kubernetes"
+		cluster = "kubernetes"
 		`,
 			configObj: v1alpha3.CPIConfig{
 				Global: v1alpha3.CPIGlobalConfig{
@@ -569,7 +569,7 @@ func TestUnmarshalINI(t *testing.T) {
 				Workspace: v1alpha3.CPIWorkspaceConfig{
 					Server:     "0.0.0.0",
 					Datacenter: "us-west",
-					Folder:     "kubernetes",
+					Cluster:     "kubernetes",
 				},
 			},
 		},
@@ -588,7 +588,7 @@ func TestUnmarshalINI(t *testing.T) {
 		[Workspace]
 		server = "0.0.0.0"
 		datacenter = "us-west"
-		folder = "kubernetes"
+		cluster = "kubernetes"
 		`,
 			configObj: v1alpha3.CPIConfig{
 				Global: v1alpha3.CPIGlobalConfig{
@@ -604,7 +604,7 @@ func TestUnmarshalINI(t *testing.T) {
 				Workspace: v1alpha3.CPIWorkspaceConfig{
 					Server:     "0.0.0.0",
 					Datacenter: "us-west",
-					Folder:     "kubernetes",
+					Cluster:     "kubernetes",
 				},
 			},
 		},
@@ -692,7 +692,7 @@ func TestPasswords(t *testing.T) {
 			[Workspace]
 			server = 0.0.0.0
 			datacenter = "us-west"
-			folder = "kubernetes"
+			cluster = "kubernetes"
 `
 			expectedConfig := v1alpha3.CPIConfig{
 				Global: v1alpha3.CPIGlobalConfig{
@@ -709,7 +709,7 @@ func TestPasswords(t *testing.T) {
 				Workspace: v1alpha3.CPIWorkspaceConfig{
 					Server:     "0.0.0.0",
 					Datacenter: "us-west",
-					Folder:     "kubernetes",
+					Cluster:     "kubernetes",
 				},
 			}
 
