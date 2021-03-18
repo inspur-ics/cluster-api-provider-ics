@@ -253,6 +253,8 @@ github.com/inspur-ics/ics-go-sdk v0.0.0-20210316140544-e42057437ea0 h1:ad5wEcssk
 github.com/inspur-ics/ics-go-sdk v0.0.0-20210316140544-e42057437ea0/go.mod h1:4T91WGHr5++kOp/QZ6tQCPrYAhfBmPd8lDO0yruBHx0=
 github.com/inspur-ics/ics-go-sdk v0.0.0-20210317084608-8fffbc56e2d9 h1:18tmFpqLHnkMqK2iKpgKItkPem9XTUtC19USnaM5C/w=
 github.com/inspur-ics/ics-go-sdk v0.0.0-20210317084608-8fffbc56e2d9/go.mod h1:4T91WGHr5++kOp/QZ6tQCPrYAhfBmPd8lDO0yruBHx0=
+github.com/inspur-ics/ics-go-sdk v0.0.0-20210317123428-c701d3f6fbc2 h1:OUs7v6VQDCvGHRF1LVnwwDwDPWne8Macq9qc8T04c0U=
+github.com/inspur-ics/ics-go-sdk v0.0.0-20210317123428-c701d3f6fbc2/go.mod h1:4T91WGHr5++kOp/QZ6tQCPrYAhfBmPd8lDO0yruBHx0=
 github.com/jimstudt/http-authentication v0.0.0-20140401203705-3eca13d6893a/go.mod h1:wK6yTYYcgjHE1Z1QtXACPDjcFJyBskHEdagmnq3vsP8=
 github.com/jonboulle/clockwork v0.1.0/go.mod h1:Ii8DK3G1RaLaWxj9trq07+26W01tbo22gdxWY5EU2bo=
 github.com/json-iterator/go v0.0.0-20180612202835-f2b4162afba3/go.mod h1:+SdeFBvtyEkXs7REEP0seUULqWtbJapLOCVDaaPEHmU=

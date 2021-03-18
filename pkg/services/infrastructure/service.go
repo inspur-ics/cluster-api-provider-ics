@@ -30,9 +30,7 @@ import (
 
 	infrav1 "github.com/inspur-ics/cluster-api-provider-ics/api/v1alpha3"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
-	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/infrastructure/extra"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/infrastructure/net"
-	"github.com/inspur-ics/cluster-api-provider-ics/pkg/util"
 )
 
 // VMService provdes API to interact with the VMs using govmomi
@@ -79,14 +77,8 @@ func (vms *VMService) ReconcileVM(ctx *context.VMContext) (vm infrav1.VirtualMac
 
 		// Otherwise, this is a new machine and the  the VM should be created.
 
-		// Get the bootstrap data.
-		bootstrapData, err := vms.getBootstrapData(ctx)
-		if err != nil {
-			return vm, err
-		}
-
 		// Create the VM.
-		return vm, createVM(ctx, bootstrapData)
+		return vm, createVM(ctx)
 	}
 
 	//
@@ -103,11 +95,19 @@ func (vms *VMService) ReconcileVM(ctx *context.VMContext) (vm infrav1.VirtualMac
 
 	vms.reconcileUUID(vmCtx)
 
+	//TODO [WYC] check network business
 	if err := vms.reconcileNetworkStatus(vmCtx); err != nil {
 		return vm, err
 	}
 
-	if ok, err := vms.reconcileMetadata(vmCtx); err != nil || !ok {
+	// Get the bootstrap data.
+	bootstrapData, err := vms.getBootstrapData(ctx)
+	if err != nil {
+		return vm, err
+	}
+
+	// ICS VM check and update cloud init configuration data
+	if ok, err := vms.reconcileMetadata(vmCtx, bootstrapData); err != nil || !ok {
 		return vm, err
 	}
 
@@ -199,16 +199,17 @@ func (vms *VMService) reconcileNetworkStatus(ctx *virtualMachineContext) error {
 	return nil
 }
 
-func (vms *VMService) reconcileMetadata(ctx *virtualMachineContext) (bool, error) {
+func (vms *VMService) reconcileMetadata(ctx *virtualMachineContext, newMetadata []byte) (bool, error) {
 	existingMetadata, err := vms.getMetadata(ctx)
 	if err != nil {
 		return false, err
 	}
 
-	newMetadata, err := util.GetMachineMetadata(ctx.ICSVM.Name, *ctx.ICSVM, ctx.State.Network...)
-	if err != nil {
-		return false, err
-	}
+	//TODO [WYC] Deprecated
+	//newMetadata, err := util.GetMachineMetadata(ctx.ICSVM.Name, *ctx.ICSVM, ctx.State.Network...)
+	//if err != nil {
+	//	return false, err
+	//}
 
 	// If the metadata is the same then return early.
 	if string(newMetadata) == existingMetadata {
@@ -287,43 +288,12 @@ func (vms *VMService) getPowerState(ctx *virtualMachineContext) (infrav1.Virtual
 }
 
 func (vms *VMService) getMetadata(ctx *virtualMachineContext) (string, error) {
-	// TODO [WYC] ADD CLOUD-INI CONFIG
 	vm, err := ctx.Obj.GetVM(ctx, ctx.Ref.Value)
 	if err != nil {
 		return "", errors.Wrapf(err, "unable to cloud init meta data for vm %s", ctx.Ref.Value)
 	}
-	//var (
-	//	obj types.VirtualMachine
-	//
-	//	pc    = property.DefaultCollector(ctx.Session.Client.Client)
-	//	props = []string{"config.extraConfig"}
-	//)
-	//
-	//if err := pc.RetrieveOne(ctx, ctx.Ref, props, &obj); err != nil {
-	//	return "", errors.Wrapf(err, "unable to fetch props %v for vm %s", props, ctx)
-	//}
-	//if obj.Config == nil {
-	//	return "", nil
-	//}
-	//
-	//var metadataBase64 string
-	//for _, ec := range obj.Config.ExtraConfig {
-	//	if optVal := ec.GetOptionValue(); optVal != nil {
-	//		// TODO(akutz) Using a switch instead of if in case we ever
-	//		//             want to check the metadata encoding as well.
-	//		//             Since the image stamped images always use
-	//		//             base64, it should be okay to not check.
-	//		// nolint
-	//		switch optVal.Key {
-	//		case guestInfoKeyMetadata:
-	//			if v, ok := optVal.Value.(string); ok {
-	//				metadataBase64 = v
-	//			}
-	//		}
-	//	}
-	//}
-	// TODO [WYC] ADD CLOUD-INI CONFIG
-	metadataBase64 := vm.ConfigLocation
+
+	metadataBase64 := vm.ExtendData
 	if metadataBase64 == "" {
 		return "", nil
 	}
@@ -337,17 +307,14 @@ func (vms *VMService) getMetadata(ctx *virtualMachineContext) (string, error) {
 }
 
 func (vms *VMService) setMetadata(ctx *virtualMachineContext, metadata []byte) (string, error) {
-	var extraConfig extra.Config
-	if err := extraConfig.SetCloudInitMetadata(metadata); err != nil {
-		return "", errors.Wrapf(err, "unable to set metadata on vm %s", ctx)
-	}
+	metadataBase64 := base64.StdEncoding.EncodeToString(metadata)
+
 	vmObj, err := ctx.Obj.GetVM(ctx, ctx.Ref.Value)
 	if err != nil {
 		return "", errors.Wrapf(err, "unable to get vm %s", ctx.Ref.Value)
 	}
 
-	// TODO [WYC] ADD CLOUD-INI CONFIG
-	vmObj.Tags = extraConfig
+	vmObj.ExtendData = metadataBase64
 
 	task, err := ctx.Obj.SetVM(ctx, *vmObj)
 	if err != nil {

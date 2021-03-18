@@ -28,7 +28,7 @@ import (
 
 // Clone kicks off a clone operation on vCenter to create a new virtual machine.
 // nolint:gocognit
-func Clone(ctx *context.VMContext, bootstrapData []byte) error {
+func Clone(ctx *context.VMContext) error {
 	ctx = &context.VMContext{
 		ControllerContext: ctx.ControllerContext,
 		ICSVM:         ctx.ICSVM,
@@ -37,15 +37,6 @@ func Clone(ctx *context.VMContext, bootstrapData []byte) error {
 		PatchHelper:       ctx.PatchHelper,
 	}
 	ctx.Logger.Info("starting clone process")
-
-	//TODO [WYC] Completed clone vm and edit vm add extraConfig
-	//var extraConfig extra.Config
-	//if len(bootstrapData) > 0 {
-	//	ctx.Logger.Info("applied bootstrap data to VM clone spec")
-	//	if err := extraConfig.SetCloudInitUserData(bootstrapData); err != nil {
-	//		return err
-	//	}
-	//}
 
 	tpl, err := template.FindTemplate(ctx, ctx.ICSVM.Spec.Template)
 	if err != nil {
@@ -64,7 +55,7 @@ func Clone(ctx *context.VMContext, bootstrapData []byte) error {
 	//}
 
 	storageService := storage.NewStorageService(ctx.GetSession().Client)
-	dataStore, err := storageService.GetDatastoreByName(ctx, ctx.ICSVM.Spec.Datastore)
+	dataStore, err := storageService.GetStorageInfoByName(ctx, ctx.ICSVM.Spec.Datastore)
 	if err != nil {
 		return errors.Wrapf(err, "unable to get DataStore for %q", ctx)
 	}

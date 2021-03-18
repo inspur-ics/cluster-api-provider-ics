@@ -21,6 +21,6 @@ import (
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/infrastructure/icenter"
 )
 
-func createVM(ctx *context.VMContext, bootstrapData []byte) error {
-	return icenter.Clone(ctx, bootstrapData)
+func createVM(ctx *context.VMContext) error {
+	return icenter.Clone(ctx)
 }
