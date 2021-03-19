@@ -57,6 +57,10 @@ spec:
                           but fails gracefully to FullClone if the source of the clone
                           operation has no snapshots.
                         type: string
+                      cluster:
+                        description: Cluster is the name or inventory path of the
+                          cluster in which the virtual machine is created/located.
+                        type: string
                       datacenter:
                         description: Datacenter is the name or inventory path of the
                           datacenter in which the virtual machine is created/located.
@@ -71,10 +75,6 @@ spec:
                           template from which the virtual machine is cloned.
                         format: int32
                         type: integer
-                      cluster:
-                        description: Cluster is the name or inventory path of the cluster
-                          in which the virtual machine is created/located.
-                        type: string
                       memoryMiB:
                         description: MemoryMiB is the size of a virtual machine's
                           memory, in MiB. Defaults to the eponymous property value

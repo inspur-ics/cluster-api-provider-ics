@@ -205,15 +205,15 @@ spec:
                   workspace:
                     description: Workspace is the ics cloud provider's workspace configuration.
                     properties:
+                      cluster:
+                        description: Cluster is the cluster in which VMs are created/located.
+                        type: string
                       datacenter:
                         description: Datacenter is the datacenter in which VMs are
                           created/located.
                         type: string
                       datastore:
                         description: Datastore is the datastore in which VMs are created/located.
-                        type: string
-                      cluster:
-                        description: Cluster is the cluster in which VMs are created/located.
                         type: string
                       resourcePool:
                         description: ResourcePool is the resource pool in which VMs

@@ -17,8 +17,13 @@ limitations under the License.
 package icenter
 
 import (
+	"math/rand"
+
 	"github.com/inspur-ics/ics-go-sdk/client/types"
-	"github.com/inspur-ics/ics-go-sdk/storage"
+	clusterapi "github.com/inspur-ics/ics-go-sdk/cluster"
+	hostapi "github.com/inspur-ics/ics-go-sdk/host"
+	networkapi "github.com/inspur-ics/ics-go-sdk/network"
+	storageapi "github.com/inspur-ics/ics-go-sdk/storage"
 	vmapi "github.com/inspur-ics/ics-go-sdk/vm"
 	"github.com/pkg/errors"
 
@@ -38,15 +43,19 @@ func Clone(ctx *context.VMContext) error {
 	}
 	ctx.Logger.Info("starting clone process")
 
+	vmTemplate := types.VirtualMachine{}
 	tpl, err := template.FindTemplate(ctx, ctx.ICSVM.Spec.Template)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "unable to get vm template for %q", ctx)
 	}
+	vmTemplate.ID = tpl.ID
+	vmTemplate.Name = ctx.ICSVM.Name
 
-	//datastore, err := ctx.Session.Finder.DatastoreOrDefault(ctx, ctx.ICSVM.Spec.Datastore)
-	//if err != nil {
-	//	return errors.Wrapf(err, "unable to get datastore for %q", ctx)
-	//}
+	clusterService := clusterapi.NewClusterService(ctx.Session.Client)
+	cluster, err := clusterService.GetClusterByName(ctx, ctx.ICSVM.Spec.Cluster)
+	if err != nil {
+		return errors.Wrapf(err, "unable to get cluster for %q", ctx)
+	}
 
 	//TODO [WYC]ics system no resource pool design
 	//pool, err := ctx.Session.Finder.ResourcePoolOrDefault(ctx, ctx.ICSVM.Spec.ResourcePool)
@@ -54,26 +63,43 @@ func Clone(ctx *context.VMContext) error {
 	//	return errors.Wrapf(err, "unable to get resource pool for %q", ctx)
 	//}
 
-	storageService := storage.NewStorageService(ctx.GetSession().Client)
+	storageService := storageapi.NewStorageService(ctx.GetSession().Client)
 	dataStore, err := storageService.GetStorageInfoByName(ctx, ctx.ICSVM.Spec.Datastore)
 	if err != nil {
 		return errors.Wrapf(err, "unable to get DataStore for %q", ctx)
 	}
 
+	networks := make(map[int]types.Network)
+	networkService := networkapi.NewNetworkService(ctx.GetSession().Client)
+	for index, device := range ctx.ICSVM.Spec.Network.Devices {
+		network, err := networkService.GetNetworkByName(ctx, device.NetworkName)
+		if err != nil {
+			return errors.Wrapf(err, "unable to get cluster for %q", ctx)
+		}
+		networks[index] = *network
+	}
+
+	host, err := getAvailableHosts(ctx, *cluster, *dataStore, networks)
+	if err != nil {
+		return errors.Wrapf(err, "unable to get available host for %q", ctx)
+	}
+	vmTemplate.HostID = host.ID
+	vmTemplate.HostName = host.Name
+
 	diskSpecs, err := getDiskSpecs(dataStore, tpl.Disks)
 	if err != nil {
 		return errors.Wrapf(err, "error getting disk spec for %q", ctx)
 	}
-	tpl.Disks = diskSpecs
+	vmTemplate.Disks = diskSpecs
 
-	networkSpecs, err := getNetworkSpecs(ctx, tpl.Nics)
+	networkSpecs, err := getNetworkSpecs(ctx, tpl.Nics, networks)
 	if err != nil {
 		return errors.Wrapf(err, "error getting network specs for %q", ctx)
 	}
-	tpl.Nics = networkSpecs
+	vmTemplate.Nics = networkSpecs
 
 	virtualMachineService := vmapi.NewVirtualMachineService(ctx.GetSession().Client)
-	task, err := virtualMachineService.CreateVMByTemplate(ctx, *tpl, true)
+	task, err := virtualMachineService.CreateVMByTemplate(ctx, vmTemplate, true)
 	if err != nil {
 		return errors.Wrapf(err, "error trigging clone op for machine %s", ctx)
 	}
@@ -110,37 +136,33 @@ func getDiskSpecs(dataStore *types.Storage,
 
 func getNetworkSpecs(
 	ctx *context.VMContext,
-	devices []types.Nic) ([]types.Nic, error) {
+	devices []types.Nic,
+	networks map[int]types.Network) ([]types.Nic, error) {
 
 	var deviceSpecs []types.Nic
 
 	// Add new NICs based on the machine config.
 	for index, nic := range devices {
-		var netSpec types.Nic
+		netSpec := nic
 		if len(ctx.ICSVM.Spec.Network.Devices) > index {
-			spec := &ctx.ICSVM.Spec.Network.Devices[index]
-			//TODO [WYC API WAITING] Query Network Information
-			//ref, err := ctx.Session.Finder.Network(ctx, netSpec.NetworkName)
-			//if err != nil {
-			//	return nil, errors.Wrapf(err, "unable to find network %q", netSpec.NetworkName)
-			//}
+			network := networks[index]
 			netSpec = types.Nic{
-				DeviceID:   nic.DeviceID,
-				DeviceName: nic.DeviceName,
-				NetworkID:  nic.NetworkID,
+				DeviceID:   network.ID,
+				DeviceName: network.Name,
+				NetworkID:  network.ID,
 			}
-			//TODO [WYC API WAITING] static network config
-			netSpec.Gateway = spec.Gateway4
-		} else {
-			netSpec = types.Nic{
-				DeviceID:   nic.DeviceID,
-				DeviceName: nic.DeviceName,
-				NetworkID:  nic.NetworkID,
+
+			deviceSpec := &ctx.ICSVM.Spec.Network.Devices[index]
+
+			// Check to see if the IP is in the list of the device
+			// spec's static IP addresses.
+			isStatic := true
+			if deviceSpec.DHCP4 || deviceSpec.DHCP6 {
+				isStatic = false
 			}
-			if len(nic.IP) != 0 {
-				netSpec.IP = nic.IP
-				netSpec.Netmask = nic.Netmask
-				netSpec.Gateway = nic.Gateway
+			if isStatic {
+				//TODO [WYC API WAITING] static network config
+				netSpec.Gateway = deviceSpec.Gateway4
 			}
 		}
 
@@ -148,4 +170,64 @@ func getNetworkSpecs(
 	}
 
 	return deviceSpecs, nil
+}
+
+func getAvailableHosts(ctx *context.VMContext, cluster types.Cluster,
+	dataStore types.Storage, networks map[int]types.Network) (types.Host, error) {
+	var (
+		host              = types.Host{}
+		storageHostsIndex = map[string]string{}
+		networkHostsIndex = map[string]string{}
+		availableHosts      []types.Host
+	)
+
+	hostService := hostapi.NewHostService(ctx.Session.Client)
+	clusterHosts, err := hostService.GetHostListByClusterID(ctx, cluster.Id)
+	if err != nil {
+		return types.Host{}, err
+	}
+
+	storageHosts, err := hostService.GetHostListByStorageID(ctx, dataStore.ID)
+	if err != nil {
+		return types.Host{}, err
+	}
+	for _, host := range storageHosts {
+		if host.ID != "" {
+			storageHostsIndex[host.ID] = host.Name
+		}
+	}
+
+	hostBounds := make(map[string]int)
+	for _, network := range networks {
+		networkHosts, err := hostService.GetHostListByNetworkID(ctx, network.ID)
+		if err != nil {
+			return types.Host{}, err
+		}
+		for _, host := range networkHosts {
+			if host.ID != "" {
+				hostBounds[host.ID]++
+			}
+		}
+	}
+	totalBounds := len(networks)
+	for hostID, bounds := range hostBounds {
+		if bounds == totalBounds {
+			networkHostsIndex[hostID] = "network"
+		}
+	}
+
+	for _, host := range clusterHosts {
+		if host.ID != "" && host.Status == "CONNECTED" {
+			_, storageOK := storageHostsIndex[host.ID]
+			_, networkOK := networkHostsIndex[host.ID]
+			if storageOK && networkOK {
+				availableHosts = append(availableHosts, *host)
+			}
+		}
+	}
+	if len(availableHosts) > 0 {
+		index := rand.Intn(len(availableHosts))
+		host = availableHosts[index]
+	}
+	return host, nil
 }
