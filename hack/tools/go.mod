@@ -1,11 +1,12 @@
 module sigs.k8s.io/cluster-api/hack/tools
 
-go 1.12
+go 1.13
 
 require (
 	github.com/golangci/golangci-lint v1.23.8
+	github.com/inspur-ics/ics-go-sdk v0.1.1
 	github.com/onsi/ginkgo v1.12.0
-	github.com/vmware/govmomi v0.21.0
+	github.com/vmware/govmomi v0.24.1 // indirect
 	k8s.io/code-generator v0.17.3
 	sigs.k8s.io/controller-tools v0.2.6
 	sigs.k8s.io/kind v0.7.0

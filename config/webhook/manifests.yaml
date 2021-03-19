@@ -11,7 +11,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-infrastructure-cluster-x-k8s-io-v1alpha4-icscluster
+      path: /validate-infrastructure-cluster-x-k8s-io-v1alpha3-icscluster
   failurePolicy: Fail
   matchPolicy: Equivalent
   name: validation.icscluster.infrastructure.x-k8s.io
@@ -19,7 +19,7 @@ webhooks:
   - apiGroups:
     - infrastructure.cluster.x-k8s.io
     apiVersions:
-    - v1alpha4
+    - v1alpha3
     operations:
     - CREATE
     - UPDATE
@@ -30,7 +30,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-infrastructure-cluster-x-k8s-io-v1alpha4-icsmachine
+      path: /validate-infrastructure-cluster-x-k8s-io-v1alpha3-icsmachine
   failurePolicy: Fail
   matchPolicy: Equivalent
   name: validation.icsmachine.infrastructure.x-k8s.io
@@ -38,7 +38,7 @@ webhooks:
   - apiGroups:
     - infrastructure.cluster.x-k8s.io
     apiVersions:
-    - v1alpha4
+    - v1alpha3
     operations:
     - CREATE
     - UPDATE
@@ -49,7 +49,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-infrastructure-cluster-x-k8s-io-v1alpha4-icsmachinetemplate
+      path: /validate-infrastructure-cluster-x-k8s-io-v1alpha3-icsmachinetemplate
   failurePolicy: Fail
   matchPolicy: Equivalent
   name: validation.icsmachinetemplate.infrastructure.x-k8s.io
@@ -57,7 +57,7 @@ webhooks:
   - apiGroups:
     - infrastructure.cluster.x-k8s.io
     apiVersions:
-    - v1alpha4
+    - v1alpha3
     operations:
     - CREATE
     - UPDATE
@@ -68,7 +68,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-infrastructure-cluster-x-k8s-io-v1alpha4-icsvm
+      path: /validate-infrastructure-cluster-x-k8s-io-v1alpha3-icsvm
   failurePolicy: Fail
   matchPolicy: Equivalent
   name: validation.icsvm.infrastructure.x-k8s.io
@@ -76,9 +76,28 @@ webhooks:
   - apiGroups:
     - infrastructure.cluster.x-k8s.io
     apiVersions:
-    - v1alpha4
+    - v1alpha3
     operations:
     - CREATE
     - UPDATE
     resources:
     - icsvms
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-infrastructure-cluster-x-k8s-io-v1alpha3-ipaddress
+  failurePolicy: Fail
+  matchPolicy: Equivalent
+  name: validation.icscluster.infrastructure.x-k8s.io
+  rules:
+    - apiGroups:
+        - infrastructure.cluster.x-k8s.io
+      apiVersions:
+        - v1alpha3
+      operations:
+        - CREATE
+        - UPDATE
+      resources:
+        - ipaddresses
