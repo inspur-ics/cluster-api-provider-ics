@@ -8,7 +8,7 @@ require (
 	github.com/go-resty/resty/v2 v2.4.0 // indirect
 	github.com/google/go-cmp v0.4.0
 	github.com/google/uuid v1.1.1
-	github.com/inspur-ics/ics-go-sdk v0.0.0-20210317123428-c701d3f6fbc2
+	github.com/inspur-ics/ics-go-sdk v0.0.0-20210319013713-6b886dc17a30
 	github.com/onsi/ginkgo v1.12.0
 	github.com/onsi/gomega v1.9.0
 	github.com/pkg/errors v0.9.1

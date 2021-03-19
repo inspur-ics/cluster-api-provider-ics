@@ -255,6 +255,12 @@ github.com/inspur-ics/ics-go-sdk v0.0.0-20210317084608-8fffbc56e2d9 h1:18tmFpqLH
 github.com/inspur-ics/ics-go-sdk v0.0.0-20210317084608-8fffbc56e2d9/go.mod h1:4T91WGHr5++kOp/QZ6tQCPrYAhfBmPd8lDO0yruBHx0=
 github.com/inspur-ics/ics-go-sdk v0.0.0-20210317123428-c701d3f6fbc2 h1:OUs7v6VQDCvGHRF1LVnwwDwDPWne8Macq9qc8T04c0U=
 github.com/inspur-ics/ics-go-sdk v0.0.0-20210317123428-c701d3f6fbc2/go.mod h1:4T91WGHr5++kOp/QZ6tQCPrYAhfBmPd8lDO0yruBHx0=
+github.com/inspur-ics/ics-go-sdk v0.0.0-20210318075211-bedf9d47ea84 h1:4JWe+s0JM7+rNFtkGc0SM5ggAi773M0nnpWrstAxxG0=
+github.com/inspur-ics/ics-go-sdk v0.0.0-20210318075211-bedf9d47ea84/go.mod h1:4T91WGHr5++kOp/QZ6tQCPrYAhfBmPd8lDO0yruBHx0=
+github.com/inspur-ics/ics-go-sdk v0.0.0-20210318120004-feb77a72c4e8 h1:d9FOte6OEMggHJ1/I5RoNECTLpeUV/LxoZUIqGF8k0s=
+github.com/inspur-ics/ics-go-sdk v0.0.0-20210318120004-feb77a72c4e8/go.mod h1:4T91WGHr5++kOp/QZ6tQCPrYAhfBmPd8lDO0yruBHx0=
+github.com/inspur-ics/ics-go-sdk v0.0.0-20210319013713-6b886dc17a30 h1:/M+PipGSy+s9Qt4OFOwqzErkVSbJMPlRJLOBcQSYpgA=
+github.com/inspur-ics/ics-go-sdk v0.0.0-20210319013713-6b886dc17a30/go.mod h1:4T91WGHr5++kOp/QZ6tQCPrYAhfBmPd8lDO0yruBHx0=
 github.com/jimstudt/http-authentication v0.0.0-20140401203705-3eca13d6893a/go.mod h1:wK6yTYYcgjHE1Z1QtXACPDjcFJyBskHEdagmnq3vsP8=
 github.com/jonboulle/clockwork v0.1.0/go.mod h1:Ii8DK3G1RaLaWxj9trq07+26W01tbo22gdxWY5EU2bo=
 github.com/json-iterator/go v0.0.0-20180612202835-f2b4162afba3/go.mod h1:+SdeFBvtyEkXs7REEP0seUULqWtbJapLOCVDaaPEHmU=
@@ -538,6 +544,7 @@ golang.org/x/sys v0.0.0-20200122134326-e047566fdf82 h1:ywK/j/KkyTHcdyYSZNXGjMwgm
 golang.org/x/sys v0.0.0-20200122134326-e047566fdf82/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20201119102817-f84b799fce68 h1:nxC68pudNYkKU6jWhgrqdreuFiOQWj1Fs7T3VrH4Pjw=
 golang.org/x/sys v0.0.0-20201119102817-f84b799fce68/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.0.0-20210315160823-c6e025ad8005 h1:pDMpM2zh2MT0kHy037cKlSby2nEhD50SYqwQk76Nm40=
 golang.org/x/sys v0.0.0-20210315160823-c6e025ad8005/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1/go.mod h1:bj7SfCRtBDWHUb9snDiAeCFNEtKQo2Wmx5Cou7ajbmo=
 golang.org/x/text v0.0.0-20160726164857-2910a502d2bf/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
