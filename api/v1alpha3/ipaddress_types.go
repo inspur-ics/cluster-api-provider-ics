@@ -31,10 +31,10 @@ const (
 type IPAddressSpec struct {
 
 	// VM points to the object the ICSVM was created for.
-	VM corev1.ObjectReference `json:"vm"`
+	VMRef corev1.ObjectReference `json:"vmRef"`
 
 	// Template is the ICSMachineTemplate this was generated from.
-	Template corev1.ObjectReference `json:"template"`
+	TemplateRef corev1.ObjectReference `json:"templateRef"`
 
 	// +kubebuilder:validation:Maximum=128
 	// Prefix is the mask of the network as integer (max 128)

@@ -45,11 +45,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	infrav1 "github.com/inspur-ics/cluster-api-provider-ics/api/v1alpha3"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/record"
 	infrautilv1 "github.com/inspur-ics/cluster-api-provider-ics/pkg/util"
+	kerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 // +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=icsmachines,verbs=get;list;watch;create;update;patch;delete
@@ -199,9 +199,9 @@ func (r machineReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result, reterr er
 	machineContext := &context.MachineContext{
 		ControllerContext: r.ControllerContext,
 		Cluster:           cluster,
-		ICSCluster:    icsCluster,
+		ICSCluster:        icsCluster,
 		Machine:           machine,
-		ICSMachine:    icsMachine,
+		ICSMachine:        icsMachine,
 		Logger:            r.Logger.WithName(req.Namespace).WithName(req.Name),
 		PatchHelper:       patchHelper,
 	}

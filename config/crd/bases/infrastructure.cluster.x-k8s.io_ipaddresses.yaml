@@ -63,7 +63,7 @@ spec:
                 description: Prefix is the mask of the network as integer (max 128)
                 maximum: 128
                 type: integer
-              template:
+              templateRef:
                 description: Template is the ICSMachineTemplate this was generated
                   from.
                 properties:
@@ -100,7 +100,7 @@ spec:
                     description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
                     type: string
                 type: object
-              vm:
+              vmRef:
                 description: VM points to the object the ICSVM was created for.
                 properties:
                   apiVersion:
