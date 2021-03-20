@@ -138,8 +138,8 @@ spec:
                 type: object
             required:
             - address
-            - template
-            - vm
+            - templateRef
+            - vmRef
             type: object
         type: object
     served: true
