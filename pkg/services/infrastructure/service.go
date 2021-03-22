@@ -18,14 +18,10 @@ package infrastructure
 
 import (
 	"encoding/base64"
-	"fmt"
-
 	"github.com/pkg/errors"
 
 	corev1 "k8s.io/api/core/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
-	capierrors "sigs.k8s.io/cluster-api/errors"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	infrav1 "github.com/inspur-ics/cluster-api-provider-ics/api/v1alpha3"
@@ -69,12 +65,12 @@ func (vms *VMService) ReconcileVM(ctx *context.VMContext) (vm infrav1.VirtualMac
 			return vm, err
 		}
 
-		// If the machine was not found by BIOS UUID it means that it got deleted from icenter directly
-		if wasNotFoundByBIOSUUID(err) {
-			ctx.ICSVM.Status.FailureReason = capierrors.MachineStatusErrorPtr(capierrors.UpdateMachineError)
-			ctx.ICSVM.Status.FailureMessage = pointer.StringPtr(fmt.Sprintf("Unable to find VM by BIOS UUID %s. The vm was removed from infra", ctx.ICSVM.Spec.BiosUUID))
-			return vm, err
-		}
+		//// If the machine was not found by BIOS UUID it means that it got deleted from icenter directly
+		//if wasNotFoundByBIOSUUID(err) {
+		//	ctx.ICSVM.Status.FailureReason = capierrors.MachineStatusErrorPtr(capierrors.UpdateMachineError)
+		//	ctx.ICSVM.Status.FailureMessage = pointer.StringPtr(fmt.Sprintf("Unable to find VM by BIOS UUID %s. The vm was removed from infra", ctx.ICSVM.Spec.BiosUUID))
+		//	return vm, err
+		//}
 
 		// Otherwise, this is a new machine and the  the VM should be created.
 
@@ -96,11 +92,6 @@ func (vms *VMService) ReconcileVM(ctx *context.VMContext) (vm infrav1.VirtualMac
 
 	vms.reconcileUUID(vmCtx)
 
-	//TODO [WYC] check network business
-	if err := vms.reconcileNetworkStatus(vmCtx); err != nil {
-		return vm, err
-	}
-
 	// Get the bootstrap data.
 	bootstrapData, err := vms.getBootstrapData(ctx)
 	if err != nil {
@@ -113,6 +104,11 @@ func (vms *VMService) ReconcileVM(ctx *context.VMContext) (vm infrav1.VirtualMac
 	}
 
 	if ok, err := vms.reconcilePowerState(vmCtx); err != nil || !ok {
+		return vm, err
+	}
+
+	//TODO [WYC] check network business
+	if err := vms.reconcileNetworkStatus(vmCtx); err != nil {
 		return vm, err
 	}
 
@@ -337,7 +333,7 @@ func (vms *VMService) getNetworkStatus(ctx *virtualMachineContext) ([]infrav1.Ne
 		return nil, err
 	}
 	ctx.Logger.V(4).Info("got allNetStatus", "status", allNetStatus)
-	apiNetStatus := []infrav1.NetworkStatus{}
+	var apiNetStatus []infrav1.NetworkStatus
 	for _, s := range allNetStatus {
 		apiNetStatus = append(apiNetStatus, infrav1.NetworkStatus{
 			Connected:   s.Connected,

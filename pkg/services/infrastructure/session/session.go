@@ -39,12 +39,12 @@ type Session struct {
 // already exist.
 func GetOrCreate(
 	ctx context.Context,
-	server, datacenter, username, password string) (*Session, error) {
+	server, dataCenter, username, password string) (*Session, error) {
 
 	sessionMU.Lock()
 	defer sessionMU.Unlock()
 
-	sessionKey := server + username + datacenter
+	sessionKey := server + username + dataCenter
 	if session, ok := sessionCache[sessionKey]; ok {
 		m := token.NewManager(session.Client)
 		if userToken, _ := m.UserSession(ctx); userToken != nil {

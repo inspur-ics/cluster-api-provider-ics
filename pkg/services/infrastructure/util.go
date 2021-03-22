@@ -18,8 +18,9 @@ package infrastructure
 
 import (
 	gocontext "context"
-	gonet "net"
+	"math/rand"
 	"strings"
+	"time"
 
 	"github.com/inspur-ics/ics-go-sdk/client/types"
 	taskapi "github.com/inspur-ics/ics-go-sdk/task"
@@ -83,6 +84,9 @@ func findVM(ctx *context.VMContext) (types.ManagedObjectReference, error) {
 				return types.ManagedObjectReference{}, errNotFound{byInventoryPath: ctx.ICSVM.Name}
 			}
 			return types.ManagedObjectReference{}, err
+		}
+		if vm == nil {
+			return types.ManagedObjectReference{}, errNotFound{byInventoryPath: ctx.ICSVM.Name}
 		}
 		reference := types.ManagedObjectReference{
 			Type: "id",
@@ -173,11 +177,6 @@ func reconcileICSVMWhenNetworkIsReady(
 				return nil, nil, errors.Errorf(
 					"unexpected power state %v for vm %s",
 					vmInfo.Status, ctx)
-			}
-
-			// Wait for all NICs to have valid MAC addresses.
-			if err := waitForMacAddresses(ctx); err != nil {
-				return nil, nil, errors.Wrapf(err, "failed to wait for mac addresses for vm %s", ctx)
 			}
 
 			// Get all the MAC addresses. This is done separately from waiting
@@ -318,21 +317,6 @@ func reconcileICSVMOnChannel(
 	}()
 }
 
-// waitForMacAddresses waits for all configured network devices to have
-// valid MAC addresses.
-func waitForMacAddresses(ctx *virtualMachineContext) error {
-	return Wait(ctx, vmapi.NewVirtualMachineService(ctx.Session.Client),
-		ctx.Ref, func(nicChanges []types.Nic) bool {
-			for _, nic := range nicChanges {
-				mac := nic.Mac
-				if mac == "" {
-					return false
-				}
-			}
-			return true
-		})
-}
-
 // getMacAddresses gets the MAC addresses for all network devices.
 // This happens separately from waitForMacAddresses to ensure returned order of
 // devices matches the spec and not order in which the propery changes were
@@ -375,16 +359,12 @@ func waitForIPAddresses(
 	var (
 		chanErrs          = make(chan error)
 		chanIPAddresses   = make(chan string)
-		macToHasIPv4Lease = map[string]struct{}{}
-		macToHasIPv6Lease = map[string]struct{}{}
-		macToSkipped      = map[string]map[string]struct{}{}
 		macToHasStaticIP  = map[string]map[string]struct{}{}
 		virtualMachineService     = vmapi.NewVirtualMachineService(ctx.Session.Client)
 	)
 
 	// Initialize the nested maps early.
 	for mac := range macToDeviceIndex {
-		macToSkipped[mac] = map[string]struct{}{}
 		macToHasStaticIP[mac] = map[string]struct{}{}
 	}
 
@@ -410,116 +390,34 @@ func waitForIPAddresses(
 				return true
 			}
 
-			// Get the network device spec that corresponds to the MAC.
-			deviceSpec := ctx.ICSVM.Spec.Network.Devices[deviceSpecIndex]
-
 			// Look at each IP and determine whether or not a reconcile has
 			// been triggered for the IP.
 			discoveredIP := nic.IP
 
-			// Ignore link-local addresses.
-			if err := net.ErrOnLocalOnlyIPAddr(discoveredIP); err != nil {
-				if _, ok := macToSkipped[mac][discoveredIP]; !ok {
-					ctx.Logger.Info("ignoring IP address", "reason", err.Error())
-					macToSkipped[mac][discoveredIP] = struct{}{}
-				}
-				continue
-			}
-
-			// Check to see if the IP is in the list of the device
-			// spec's static IP addresses.
-			isStatic := false
-			for _, specIP := range deviceSpec.IPAddrs {
-				if discoveredIP == specIP {
-					isStatic = true
-					break
-				}
-			}
-
 			// If it's a static IP then check to see if the IP has
 			// triggered a reconcile yet.
-			switch {
-			case isStatic:
-				if _, ok := macToHasStaticIP[mac][discoveredIP]; !ok {
-					// No reconcile yet. Record the IP send it to the
-					// channel.
-					ctx.Logger.Info(
-						"discovered IP address",
-						"addressType", "static",
-						"addressValue", discoveredIP)
-					macToHasStaticIP[mac][discoveredIP] = struct{}{}
-					chanIPAddresses <- discoveredIP
-				}
-			case gonet.ParseIP(discoveredIP).To4() != nil:
-				// An IPv4 address...
-				if deviceSpec.DHCP4 {
-					// Has an IPv4 lease been discovered yet?
-					if _, ok := macToHasIPv4Lease[mac]; !ok {
-						ctx.Logger.Info(
-							"discovered IP address",
-							"addressType", "dhcp4",
-							"addressValue", discoveredIP)
-						macToHasIPv4Lease[mac] = struct{}{}
-						chanIPAddresses <- discoveredIP
-					}
-				}
-			default:
-				// An IPv6 address..
-				if deviceSpec.DHCP6 {
-					// Has an IPv6 lease been discovered yet?
-					if _, ok := macToHasIPv6Lease[mac]; !ok {
-						ctx.Logger.Info(
-							"discovered IP address",
-							"addressType", "dhcp6",
-							"addressValue", discoveredIP)
-						macToHasIPv6Lease[mac] = struct{}{}
-						chanIPAddresses <- discoveredIP
-					}
-				}
+			if _, ok := macToHasStaticIP[mac][discoveredIP]; !ok {
+				// No reconcile yet. Record the IP send it to the
+				// channel.
+				ctx.Logger.Info(
+					"discovered IP address",
+					"addressType", "static",
+					"addressValue", discoveredIP)
+				macToHasStaticIP[mac][discoveredIP] = struct{}{}
+				chanIPAddresses <- discoveredIP
 			}
 		}
 
 		// Determine whether or not the wait operation is over by whether
 		// or not the VM has all of the requested IP addresses.
-		for i, deviceSpec := range ctx.ICSVM.Spec.Network.Devices {
-			mac, ok := deviceToMacIndex[i]
+		for index := range ctx.ICSVM.Spec.Network.Devices {
+			_, ok := deviceToMacIndex[index]
 			if !ok {
-				chanErrs <- errors.Errorf("invalid mac index %d waiting for ip addresses for vm %s", i, ctx)
+				chanErrs <- errors.Errorf("invalid mac index %d waiting for ip addresses for vm %s", index, ctx)
 
 				// Return true to stop the property collector from waiting
 				// on any more changes.
 				return true
-			}
-			// If the device spec requires DHCP4 then the Wait is not
-			// over if there is no IPv4 lease.
-			if deviceSpec.DHCP4 {
-				if _, ok := macToHasIPv4Lease[mac]; !ok {
-					ctx.Logger.Info(
-						"the VM is missing the requested IP address",
-						"addressType", "dhcp4")
-					return false
-				}
-			}
-			// If the device spec requires DHCP6 then the Wait is not
-			// over if there is no IPv4 lease.
-			if deviceSpec.DHCP6 {
-				if _, ok := macToHasIPv6Lease[mac]; !ok {
-					ctx.Logger.Info(
-						"the VM is missing the requested IP address",
-						"addressType", "dhcp6")
-					return false
-				}
-			}
-			// If the device spec requires static IP addresses, the wait
-			// is not over if the device lacks one of those addresses.
-			for _, specIP := range deviceSpec.IPAddrs {
-				if _, ok := macToHasStaticIP[mac][specIP]; !ok {
-					ctx.Logger.Info(
-						"the VM is missing the requested IP address",
-						"addressType", "static",
-						"addressValue", specIP)
-					return false
-				}
 			}
 		}
 
@@ -554,6 +452,7 @@ func Wait(ctx gocontext.Context, c *vmapi.VirtualMachineService, obj types.Manag
 }
 
 func WaitForUpdates(ctx gocontext.Context, c *vmapi.VirtualMachineService, obj types.ManagedObjectReference, f func([]types.Nic) bool) error {
+	startTime := time.Now()
 	_, err := c.GetVM(ctx, obj.Value)
 	if err != nil {
 		return err
@@ -564,14 +463,30 @@ func WaitForUpdates(ctx gocontext.Context, c *vmapi.VirtualMachineService, obj t
 		if err != nil {
 			return err
 		}
-
-		if vmInfo == nil {
+		if checkVMNetworkReady(vmInfo.Nics) {
 			// Retry if the result came back empty
+			waitingTime := rand.Int31n(1200)
+			time.Sleep(time.Duration(waitingTime) * time.Millisecond)
 			continue
 		}
-
 		if f(vmInfo.Nics) {
 			return nil
 		}
+
+		if time.Now().Sub(startTime) > time.Duration(900) {
+			return errors.Errorf("Get VM %s IP config error, through vmtools.", vmInfo.Name)
+		}
 	}
+}
+
+func checkVMNetworkReady(nics []types.Nic) bool {
+	status := true
+	for _, nic := range nics {
+		ip := nic.IP
+		if &ip == nil {
+			status = false
+			break
+		}
+	}
+	return status
 }

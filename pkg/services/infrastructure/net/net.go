@@ -20,12 +20,15 @@ import (
 	"net"
 	"strings"
 
-	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
+	"github.com/pkg/errors"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	infrav1 "github.com/inspur-ics/cluster-api-provider-ics/api/v1alpha3"
+	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
+	infrautilv1 "github.com/inspur-ics/cluster-api-provider-ics/pkg/util"
 	"github.com/inspur-ics/ics-go-sdk/client"
 	"github.com/inspur-ics/ics-go-sdk/client/types"
 	vmapi "github.com/inspur-ics/ics-go-sdk/vm"
-	"github.com/pkg/errors"
 )
 
 // NetworkStatus provides information about one of a VM's networks.
@@ -52,31 +55,28 @@ func GetNetworkStatus(
 	client *client.Client,
 	moRef types.ManagedObjectReference) ([]NetworkStatus, error) {
 
-	var (
-		obj types.VirtualMachine
-	)
-
 	virtualMachineService := vmapi.NewVirtualMachineService(client)
 	vm, err := virtualMachineService.GetVM(ctx, moRef.Value)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to get vm info, for vm %v", moRef)
 	}
-	obj = *vm
-	if obj.Nics == nil || len(obj.Nics) <= 0 {
+	if vm.Nics == nil {
 		return nil, errors.New("vm nics hardware device is nil")
 	}
 
 	var allNetStatus []NetworkStatus
-
-	for _, nic := range obj.Nics {
-		if len(nic.ID) != 0 {
+	for _, nic := range vm.Nics {
+		mac := nic.Mac
+		ip := nic.IP
+		if &mac != nil {
 			netStatus := NetworkStatus{
 				MACAddr: nic.Mac,
+				NetworkName: nic.DeviceName,
+				Connected: false,
 			}
-			if len(nic.IP) != 0 {
+			if &ip != nil {
+				_ = syncIPPool(ctx, nic)
 				netStatus.IPAddrs = []string{ nic.IP }
-				netStatus.NetworkName = nic.DeviceName
-				netStatus.Connected = false
 				if strings.Compare("UP", nic.Status) == 0 {
 					netStatus.Connected = true
 				}
@@ -107,6 +107,22 @@ func ErrOnLocalOnlyIPAddr(addr string) error {
 	}
 	if reason != "" {
 		return errors.Errorf("failed to validate ip addr=%v: %s", addr, reason)
+	}
+	return nil
+}
+
+func syncIPPool(
+	ctx *context.VMContext,
+	nic types.Nic) error {
+
+	// Get the IPAddress resource for this request.
+	ipAddresses := &infrav1.IPAddressList{}
+	err := ctx.Client.List(ctx, ipAddresses, ctrlclient.MatchingFields{"metadata.name": nic.IP})
+	if err != nil {
+		return err
+	}
+	if ipAddresses.Items == nil {
+		_, _ = infrautilv1.ReconcileIPAddress(ctx, nic.IP, nic)
 	}
 	return nil
 }
