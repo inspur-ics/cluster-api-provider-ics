@@ -30,7 +30,6 @@ import (
 type VMContext struct {
 	*ControllerContext
 	ICSVM           *v1alpha3.ICSVM
-	Template        *v1alpha3.ICSMachineTemplate
 	PatchHelper     *patch.Helper
 	Logger          logr.Logger
 	Session         *session.Session

@@ -25,7 +25,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha3"
 	clusterutilv1 "sigs.k8s.io/cluster-api/util"
 	ctrlutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -64,13 +63,6 @@ func ReconcileIPAddress(
 			Namespace:  ctx.ICSVM.Namespace,
 		}
 
-		ipAddress.Spec.TemplateRef = corev1.ObjectReference{
-			APIVersion: ctx.Template.APIVersion,
-			Kind:       ctx.Template.Kind,
-			Name:       ctx.Template.Name,
-			Namespace:  ctx.Template.Namespace,
-		}
-
 		ipAddress.Spec.Address = network.IP
 		ipAddress.Spec.Gateway = &network.Gateway
 		ipAddress.Spec.MACAddr = network.Mac
@@ -89,20 +81,20 @@ func ReconcileIPAddress(
 	return ipAddress, nil
 }
 
-// GetOwnerClusterName returns the Cluster object owning the current resource.
-func GetOwnerClusterName(obj metav1.ObjectMeta) *string {
-	for _, ref := range obj.OwnerReferences {
-		if ref.Kind == "Cluster" && ref.APIVersion == clusterv1.GroupVersion.String() {
-			return &ref.Name
-		}
-	}
-	return nil
-}
+//// GetOwnerClusterName returns the Cluster object owning the current resource.
+//func GetOwnerClusterName(obj metav1.ObjectMeta) *string {
+//	for _, ref := range obj.OwnerReferences {
+//		if ref.Kind == "Cluster" && ref.APIVersion == clusterv1.GroupVersion.String() {
+//			return &ref.Name
+//		}
+//	}
+//	return nil
+//}
 
 // ConvertIPAddrsToIPs transforms a ipAddrs strings into PreAllocations IP.
 func ConvertIPAddrsToPreAllocations(ipAddrs []string) map[string]string {
 	if ipAddrs == nil {
-		return nil
+		return make(map[string]string)
 	}
 	ipMap := make(map[string]string)
 	for _, addrs := range ipAddrs {
@@ -120,14 +112,14 @@ func ConvertIPAddrsToPreAllocations(ipAddrs []string) map[string]string {
 }
 
 // GetIPFromPools from cluster template
-func GetIPFromPools(
+func GetIPFromNetworkConfig(
 	ctx *context.VMContext,
-	pool *infrav1.Pool) (*string, *string, error) {
+	network *infrav1.NetworkDeviceSpec) (*string, *string, error) {
 	var	ip      string
 	var netmask string
 
-	if pool.PreAllocations ==  nil {
-		return nil, nil, errors.New("invalid ip pool")
+	if network.IPAddrs ==  nil {
+		return nil, nil, errors.New("invalid network config")
 	}
 
 	allocatedIPMap := make(map[string]string)
@@ -140,7 +132,9 @@ func GetIPFromPools(
 		allocatedIPMap[ipAddress.Spec.Address] = "unknown"
 	}
 
-	for ipAddrs, ipType  := range pool.PreAllocations {
+	preAllocations := ConvertIPAddrsToPreAllocations(network.IPAddrs)
+
+	for ipAddrs, ipType  := range preAllocations {
 		switch ipType {
 		case "cidr": {
 			preIP, err := GetIPAddressByCIDR(ipAddrs, allocatedIPMap)

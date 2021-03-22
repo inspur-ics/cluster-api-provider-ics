@@ -23,17 +23,6 @@ import (
 // ICSMachineTemplateSpec defines the desired state of ICSMachineTemplate
 type ICSMachineTemplateSpec struct {
 	Template ICSMachineTemplateResource `json:"template"`
-	Ipam     *IPAMSpec                  `json:"ipam,omitempty"`
-}
-
-// ICSMachineTemplateStatus defines the observed state of ICSMachineTemplate
-type ICSMachineTemplateStatus struct {
-	// LastUpdated identifies when this status was last observed.
-	// +optional
-	LastUpdated *metav1.Time `json:"lastUpdated,omitempty"`
-
-	// IPPoolStatus defines the observed state of IPPool.
-	Pools       []IPPoolStatus `json:"pools,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -46,7 +35,6 @@ type ICSMachineTemplate struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Spec   ICSMachineTemplateSpec   `json:"spec,omitempty"`
-	Status ICSMachineTemplateStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
