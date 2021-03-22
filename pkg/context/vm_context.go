@@ -29,10 +29,11 @@ import (
 // VMContext is a Go context used with a ICSVM.
 type VMContext struct {
 	*ControllerContext
-	ICSVM   *v1alpha3.ICSVM
-	PatchHelper *patch.Helper
-	Logger      logr.Logger
-	Session     *session.Session
+	ICSVM           *v1alpha3.ICSVM
+	Template        *v1alpha3.ICSMachineTemplate
+	PatchHelper     *patch.Helper
+	Logger          logr.Logger
+	Session         *session.Session
 }
 
 // String returns ICSVMGroupVersionKind ICSVMNamespace/ICSVMName.

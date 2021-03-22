@@ -343,7 +343,7 @@ type Pool struct {
 
 	// PreAllocations contains the preallocated IP addresses
 	// +optional
-	PreAllocations []IPAddressStr `json:"preAllocations,omitempty"`
+	PreAllocations map[string]string `json:"preAllocations,omitempty"`
 }
 
 // IPAMSpec defines a IP pool of IPAM.
@@ -362,5 +362,5 @@ type IPPoolStatus struct {
 	NetworkName string `json:"networkName"`
 
 	//Allocations contains the map of objects and IP addresses they have
-	Allocations map[IPAddressStr]string `json:"indexes,omitempty"`
+	Allocations map[string]string `json:"indexes,omitempty"`
 }

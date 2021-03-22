@@ -23,7 +23,7 @@ import (
 // ICSMachineTemplateSpec defines the desired state of ICSMachineTemplate
 type ICSMachineTemplateSpec struct {
 	Template ICSMachineTemplateResource `json:"template"`
-	Ipam     IPAMSpec                   `json:"ipam,omitempty"`
+	Ipam     *IPAMSpec                  `json:"ipam,omitempty"`
 }
 
 // ICSMachineTemplateStatus defines the observed state of ICSMachineTemplate

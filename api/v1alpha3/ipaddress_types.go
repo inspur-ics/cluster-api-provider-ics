@@ -41,10 +41,10 @@ type IPAddressSpec struct {
 	Prefix int `json:"prefix,omitempty"`
 
 	// Gateway is the gateway ip address
-	Gateway *IPAddressStr `json:"gateway,omitempty"`
+	Gateway *string `json:"gateway,omitempty"`
 
 	// Address contains the IP address
-	Address IPAddressStr `json:"address"`
+	Address string `json:"address"`
 
 	// MACAddr is the MAC address used by this device.
 	// It is generally a good idea to omit this field and allow a MAC address
@@ -55,7 +55,7 @@ type IPAddressSpec struct {
 	MACAddr string `json:"macAddr,omitempty"`
 
 	// DNSServers is the list of dns servers
-	DNSServers []IPAddressStr `json:"dnsServers,omitempty"`
+	DNSServers []string `json:"dnsServers,omitempty"`
 }
 
 // +kubebuilder:object:root=true
