@@ -22,15 +22,16 @@ import (
 
 	"github.com/pkg/errors"
 
-	vmapi "github.com/inspur-ics/ics-go-sdk/vm"
 	corev1 "k8s.io/api/core/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
 	capierrors "sigs.k8s.io/cluster-api/errors"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	infrav1 "github.com/inspur-ics/cluster-api-provider-ics/api/v1alpha3"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/infrastructure/net"
+	vmapi "github.com/inspur-ics/ics-go-sdk/vm"
 )
 
 // VMService provdes API to interact with the VMs using govmomi
@@ -175,6 +176,12 @@ func (vms *VMService) DestroyVM(ctx *context.VMContext) (infrav1.VirtualMachine,
 		}
 		ctx.ICSVM.Status.TaskRef = task.TaskId
 		ctx.Logger.Info("wait for VM to be powered off")
+		return vm, nil
+	}
+
+	// Clear IPAddresses
+	err = vms.reconcileDeleteIPAddress(ctx)
+	if err != nil {
 		return vm, nil
 	}
 
@@ -363,4 +370,30 @@ func (vms *VMService) getBootstrapData(ctx *context.VMContext) ([]byte, error) {
 	}
 
 	return value, nil
+}
+
+func (vms *VMService) reconcileDeleteIPAddress(ctx *context.VMContext) error {
+	ipAddresses := &infrav1.IPAddressList{}
+	err := ctx.Client.List(ctx, ipAddresses,
+		ctrlclient.InNamespace(ctx.ICSVM.GetNamespace()),
+		ctrlclient.MatchingFields{"spec.vmRef.name": ctx.ICSVM.GetName()},
+	)
+	if err != nil {
+		return err
+	}
+	if ipAddresses.Items != nil {
+		for _, ipAddress := range ipAddresses.Items {
+			// If the IPAddress was found and it's not already enqueued for
+			// deletion, go ahead and attempt to delete it.
+			if err := ctx.Client.Delete(ctx, ipAddress.DeepCopy()); err != nil {
+				return err
+			}
+		}
+
+		// Go ahead and return here since the deletion of the ICSVM resource
+		// will trigger a new reconcile for this ICSMachine resource.
+		return nil
+	}
+
+	return nil
 }

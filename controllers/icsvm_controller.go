@@ -27,6 +27,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha3"
@@ -49,6 +50,7 @@ import (
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services"
 	infrast "github.com/inspur-ics/cluster-api-provider-ics/pkg/services/infrastructure"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/infrastructure/session"
+	infrautilv1 "github.com/inspur-ics/cluster-api-provider-ics/pkg/util"
 )
 
 // +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=icsvms,verbs=get;list;watch;create;update;patch;delete
@@ -157,11 +159,17 @@ func (r vmReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result, reterr error) 
 	// Create the VM context for this request.
 	vmContext := &context.VMContext{
 		ControllerContext: r.ControllerContext,
-		ICSVM:         icsVM,
+		ICSVM:             icsVM,
 		Session:           authSession,
 		Logger:            r.Logger.WithName(req.Namespace).WithName(req.Name),
 		PatchHelper:       patchHelper,
 	}
+
+	template, err := r.reconcileTemplate(vmContext)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	vmContext.Template = template
 
 	// Print the task-ref upon entry and upon exit.
 	vmContext.Logger.V(4).Info(
@@ -349,6 +357,67 @@ func (r vmReconciler) reconcileNetwork(ctx *context.VMContext, vm infrav1.Virtua
 		ipAddrs = append(ipAddrs, netStatus.IPAddrs...)
 	}
 	ctx.ICSVM.Status.Addresses = ipAddrs
+}
+
+func (r vmReconciler) reconcileTemplate(ctx *context.VMContext) (*infrav1.ICSMachineTemplate, error) {
+	// Get ICSMachine for ICSVM
+	icsMachine, err := infrautilv1.GetOwnerICSMachine(r, r.Client, ctx.ICSVM.ObjectMeta)
+	if err != nil {
+		return nil, errors.Wrapf(err,
+			"failed to get ICSMachine for the ICSVM %s", ctx.ICSVM.Name)
+	}
+
+	// Get ICSMachineTemplate Info for VirtualMachine
+	icsMachineTemplate := &infrav1.ICSMachineTemplate{}
+	machineTemplateType := icsMachine.ObjectMeta.Annotations[infrav1.TemplateClonedFromGroupKindAnnotation]
+	if machineTemplateType == icsMachineTemplate.GroupVersionKind().GroupKind().String() {
+		templateName := icsMachine.ObjectMeta.Annotations[infrav1.TemplateClonedFromNameAnnotation]
+		namespacedName := apitypes.NamespacedName{
+			Namespace: ctx.ICSVM.Namespace,
+			Name:      templateName,
+		}
+		if err := r.Client.Get(r, namespacedName, icsMachineTemplate); err != nil {
+			return nil, err
+		}
+		template := icsMachineTemplate.DeepCopy()
+		if template.Spec.Ipam == nil {
+			template.Spec.Ipam = &infrav1.IPAMSpec{
+				Cluster: infrautilv1.GetOwnerClusterName(template.ObjectMeta),
+			}
+			devices := template.Spec.Template.Spec.Network.Devices
+			var pools  []infrav1.Pool
+			var status []infrav1.IPPoolStatus
+			for _, device := range devices {
+				stat := &infrav1.IPPoolStatus{
+					NetworkName: device.NetworkName,
+				}
+				status = append(status, *stat)
+				pool := &infrav1.Pool{
+					NetworkName: device.NetworkName,
+				}
+				if !device.DHCP4 && !device.DHCP6 {
+					pool.Static = true
+					pool.IPAddrs = device.IPAddrs
+					pool.PreAllocations =infrautilv1.ConvertIPAddrsToPreAllocations(device.IPAddrs)
+				} else {
+					pool.Static = false
+				}
+				pools = append(pools, *pool)
+			}
+			now := metav1.Now()
+			template.Status = infrav1.ICSMachineTemplateStatus{
+				LastUpdated:   &now,
+				Pools:         status,
+			}
+			if err := r.Client.Update(ctx, template); err != nil {
+				return icsMachineTemplate, errors.Wrapf(err,
+					"error changing ICSMachineTemplate %s/%s IPAMSpec",
+					icsMachineTemplate.GetNamespace(), icsMachineTemplate.GetName())
+			}
+			icsMachineTemplate = template
+		}
+	}
+	return icsMachineTemplate, nil
 }
 
 func (r *vmReconciler) clusterToICSVMs(a handler.MapObject) []reconcile.Request {

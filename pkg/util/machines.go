@@ -99,6 +99,18 @@ func GetICSMachine(
 	return machine, nil
 }
 
+// GetOwnerICSMachine returns the ICSMachine object owning the current resource.
+func GetOwnerICSMachine(
+	ctx context.Context,
+	c client.Client, obj metav1.ObjectMeta) (*infrav1.ICSMachine, error) {
+	for _, ref := range obj.OwnerReferences {
+		if ref.Kind == "ICSMachine" && ref.APIVersion == infrav1.GroupVersion.String() {
+			return GetICSMachine(ctx, c, obj.Namespace, ref.Name)
+		}
+	}
+	return nil, nil
+}
+
 // ErrNoMachineIPAddr indicates that no valid IP addresses were found in a machine context
 var ErrNoMachineIPAddr = errors.New("no IP addresses found for machine")
 

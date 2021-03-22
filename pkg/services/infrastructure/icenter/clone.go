@@ -17,8 +17,6 @@ limitations under the License.
 package icenter
 
 import (
-	"math/rand"
-
 	"github.com/inspur-ics/ics-go-sdk/client/types"
 	clusterapi "github.com/inspur-ics/ics-go-sdk/cluster"
 	hostapi "github.com/inspur-ics/ics-go-sdk/host"
@@ -26,9 +24,12 @@ import (
 	storageapi "github.com/inspur-ics/ics-go-sdk/storage"
 	vmapi "github.com/inspur-ics/ics-go-sdk/vm"
 	"github.com/pkg/errors"
+	"math/rand"
 
+	infrav1 "github.com/inspur-ics/cluster-api-provider-ics/api/v1alpha3"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/infrastructure/template"
+	infrautilv1 "github.com/inspur-ics/cluster-api-provider-ics/pkg/util"
 )
 
 // Clone kicks off a clone operation on vCenter to create a new virtual machine.
@@ -36,7 +37,8 @@ import (
 func Clone(ctx *context.VMContext) error {
 	ctx = &context.VMContext{
 		ControllerContext: ctx.ControllerContext,
-		ICSVM:         ctx.ICSVM,
+		ICSVM:             ctx.ICSVM,
+		Template:          ctx.Template,
 		Session:           ctx.Session,
 		Logger:            ctx.Logger.WithName("icenter"),
 		PatchHelper:       ctx.PatchHelper,
@@ -140,6 +142,7 @@ func getNetworkSpecs(
 	networks map[int]types.Network) ([]types.Nic, error) {
 
 	var deviceSpecs []types.Nic
+	icsMachineTemplate := ctx.Template
 
 	// Add new NICs based on the machine config.
 	for index, nic := range devices {
@@ -161,8 +164,26 @@ func getNetworkSpecs(
 				isStatic = false
 			}
 			if isStatic {
-				//TODO [WYC API WAITING] static network config
-				netSpec.Gateway = deviceSpec.Gateway4
+				pool := infrav1.Pool{}
+				if icsMachineTemplate.Spec.Ipam != nil {
+					for _, ipPool := range icsMachineTemplate.Spec.Ipam.Pools {
+						if ipPool.NetworkName == deviceSpec.NetworkName {
+							pool = ipPool
+							break
+						}
+					}
+				}
+				ip, netmask, err := infrautilv1.GetIPFromPools(ctx, &pool)
+				if err == nil {
+					netSpec.IP      = *ip
+					netSpec.Netmask = *netmask
+					netSpec.Gateway = deviceSpec.Gateway4
+
+					_, err := infrautilv1.ReconcileIPAddress(ctx, *ip, netSpec)
+					if err != nil {
+						continue
+					}
+				}
 			}
 		}
 

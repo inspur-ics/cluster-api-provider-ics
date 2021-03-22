@@ -163,6 +163,13 @@ func main() {
 				return err
 			}
 
+			if err := (&v1alpha3.IPAddress{}).SetupWebhookWithManager(mgr); err != nil {
+				return err
+			}
+			if err := (&v1alpha3.IPAddressList{}).SetupWebhookWithManager(mgr); err != nil {
+				return err
+			}
+
 			if err := (&v1alpha3.HAProxyLoadBalancer{}).SetupWebhookWithManager(mgr); err != nil {
 				return err
 			}
@@ -177,6 +184,9 @@ func main() {
 				return err
 			}
 			if err := controllers.AddVMControllerToManager(ctx, mgr); err != nil {
+				return err
+			}
+			if err := controllers.AddIPAddressControllerToManager(ctx, mgr); err != nil {
 				return err
 			}
 			if err := controllers.AddHAProxyLoadBalancerControllerToManager(ctx, mgr); err != nil {

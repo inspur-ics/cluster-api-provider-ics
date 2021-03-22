@@ -39,6 +39,45 @@ spec:
           spec:
             description: ICSMachineTemplateSpec defines the desired state of ICSMachineTemplate
             properties:
+              ipam:
+                description: IPAMSpec defines a IP pool of IPAM.
+                properties:
+                  cluster:
+                    description: ClusterName is the name of the Cluster this object
+                      belongs to.
+                    type: string
+                  pools:
+                    description: Pools contains the list of IP addresses pools
+                    items:
+                      description: MetaDataIPAddress contains the info to render th
+                        ip address. It is IP-version agnostic
+                      properties:
+                        ipAddrs:
+                          description: IPAddrs is a list of one or more IPv4 and/or
+                            IPv6 addresses to assign to this device. Required when
+                            DHCP4 and DHCP6 are both false.
+                          items:
+                            type: string
+                          type: array
+                        networkName:
+                          description: NetworkName is the name of the ics network
+                            to which the device will be connected.
+                          type: string
+                        preAllocations:
+                          additionalProperties:
+                            type: string
+                          description: PreAllocations contains the preallocated IP
+                            addresses
+                          type: object
+                        static:
+                          description: static is a flag that indicates whether or
+                            not to use static IP on this device.
+                          type: boolean
+                      required:
+                      - networkName
+                      type: object
+                    type: array
+                type: object
               template:
                 description: ICSMachineTemplateResource describes the data needed
                   to create a ICSMachine from a template
@@ -258,6 +297,32 @@ spec:
                 type: object
             required:
             - template
+            type: object
+          status:
+            description: ICSMachineTemplateStatus defines the observed state of ICSMachineTemplate
+            properties:
+              lastUpdated:
+                description: LastUpdated identifies when this status was last observed.
+                format: date-time
+                type: string
+              pools:
+                description: IPPoolStatus defines the observed state of IPPool.
+                items:
+                  properties:
+                    indexes:
+                      additionalProperties:
+                        type: string
+                      description: Allocations contains the map of objects and IP
+                        addresses they have
+                      type: object
+                    networkName:
+                      description: NetworkName is the name of the ics network to which
+                        the device will be connected.
+                      type: string
+                  required:
+                  - networkName
+                  type: object
+                type: array
             type: object
         type: object
     served: true

@@ -323,3 +323,44 @@ type SSHUser struct {
 	// AuthorizedKeys is one or more public SSH keys that grant remote access.
 	AuthorizedKeys []string `json:"authorizedKeys"`
 }
+
+// MetaDataIPAddress contains the info to render th ip address. It is IP-version
+// agnostic
+type Pool struct {
+	// static is a flag that indicates whether or not to use static IP on this device.
+	// +optional
+	Static bool `json:"static,omitempty"`
+
+	// NetworkName is the name of the ics network to which the device
+	// will be connected.
+	NetworkName string `json:"networkName"`
+
+	// IPAddrs is a list of one or more IPv4 and/or IPv6 addresses to assign
+	// to this device.
+	// Required when DHCP4 and DHCP6 are both false.
+	// +optional
+	IPAddrs []string `json:"ipAddrs,omitempty"`
+
+	// PreAllocations contains the preallocated IP addresses
+	// +optional
+	PreAllocations map[string]string `json:"preAllocations,omitempty"`
+}
+
+// IPAMSpec defines a IP pool of IPAM.
+type IPAMSpec struct {
+	// ClusterName is the name of the Cluster this object belongs to.
+	Cluster *string `json:"cluster,omitempty"`
+
+	//Pools contains the list of IP addresses pools
+	// +optional
+	Pools []Pool `json:"pools,omitempty"`
+}
+
+type IPPoolStatus struct {
+	// NetworkName is the name of the ics network to which the device
+	// will be connected.
+	NetworkName string `json:"networkName"`
+
+	//Allocations contains the map of objects and IP addresses they have
+	Allocations map[string]string `json:"indexes,omitempty"`
+}

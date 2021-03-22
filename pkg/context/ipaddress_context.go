@@ -20,38 +20,41 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
+	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha3"
 	"sigs.k8s.io/cluster-api/util/patch"
 
-	"github.com/inspur-ics/cluster-api-provider-ics/api/v1alpha3"
+	infrav1 "github.com/inspur-ics/cluster-api-provider-ics/api/v1alpha3"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/infrastructure/session"
 )
 
-// VMContext is a Go context used with a ICSVM.
-type VMContext struct {
+// IPAddressContext is a Go context used with a IPAddress.
+type IPAddressContext struct {
 	*ControllerContext
-	ICSVM           *v1alpha3.ICSVM
-	Template        *v1alpha3.ICSMachineTemplate
-	PatchHelper     *patch.Helper
-	Logger          logr.Logger
-	Session         *session.Session
+	Cluster        *clusterv1.Cluster
+	ICSCluster     *infrav1.ICSCluster
+	ICSVM          *infrav1.ICSVM
+	IPAddress      *infrav1.IPAddress
+	PatchHelper    *patch.Helper
+	Logger         logr.Logger
+	Session        *session.Session
 }
 
-// String returns ICSVMGroupVersionKind ICSVMNamespace/ICSVMName.
-func (c *VMContext) String() string {
-	return fmt.Sprintf("%s %s/%s", c.ICSVM.GroupVersionKind(), c.ICSVM.Namespace, c.ICSVM.Name)
+// String returns IPAddressGroupVersionKind IPAddressNamespace/IPAddressName.
+func (c *IPAddressContext) String() string {
+	return fmt.Sprintf("%s %s/%s", c.IPAddress.GroupVersionKind(), c.IPAddress.Namespace, c.IPAddress.Name)
 }
 
 // Patch updates the object and its status on the API server.
-func (c *VMContext) Patch() error {
-	return c.PatchHelper.Patch(c, c.ICSVM)
+func (c *IPAddressContext) Patch() error {
+	return c.PatchHelper.Patch(c, c.IPAddress)
 }
 
 // GetLogger returns this context's logger.
-func (c *VMContext) GetLogger() logr.Logger {
+func (c *IPAddressContext) GetLogger() logr.Logger {
 	return c.Logger
 }
 
 // GetSession returns this context's session.
-func (c *VMContext) GetSession() *session.Session {
+func (c *IPAddressContext) GetSession() *session.Session {
 	return c.Session
 }
