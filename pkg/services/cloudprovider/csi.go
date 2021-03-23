@@ -33,13 +33,13 @@ import (
 // NOTE: the contents of this file are derived from https://github.com/kubernetes-sigs/ics-csi-driver/tree/master/manifests/1.14
 
 const (
-	DefaultCSIControllerImage     = "gcr.io/cloud-provider-ics/csi/release/driver:v2.0.0"
-	DefaultCSINodeDriverImage     = "gcr.io/cloud-provider-ics/csi/release/driver:v2.0.0"
-	DefaultCSIAttacherImage       = "quay.io/k8scsi/csi-attacher:v2.0.0"
-	DefaultCSIProvisionerImage    = "quay.io/k8scsi/csi-provisioner:v1.4.0"
-	DefaultCSIMetadataSyncerImage = "gcr.io/cloud-provider-ics/csi/release/syncer:v2.0.0"
+	DefaultCSIControllerImage     = "ics-csi-driver:latest"
+	DefaultCSINodeDriverImage     = "ics-csi-driver:latest"
+	DefaultCSIAttacherImage       = "quay.io/k8scsi/csi-attacher:v1.1.1"
+	DefaultCSIProvisionerImage    = "quay.io/k8scsi/csi-provisioner:v1.2.2"
+	DefaultCSIMetadataSyncerImage = "ics-csi-syncer:latest"
 	DefaultCSILivenessProbeImage  = "quay.io/k8scsi/livenessprobe:v1.1.0"
-	DefaultCSIRegistrarImage      = "quay.io/k8scsi/csi-node-driver-registrar:v1.2.0"
+	DefaultCSIRegistrarImage      = "quay.io/k8scsi/csi-node-driver-registrar:v1.1.0"
 	CSINamespace                  = metav1.NamespaceSystem
 	CSIControllerName             = "ics-csi-controller"
 )
@@ -99,16 +99,6 @@ func CSIControllerClusterRole() *rbacv1.ClusterRole {
 				Resources: []string{"leases"},
 				Verbs:     []string{"get", "watch", "list", "delete", "update", "create"},
 			},
-			{
-				APIGroups: []string{"snapshot.storage.k8s.io"},
-				Resources: []string{"volumesnapshots"},
-				Verbs:     []string{"get", "list"},
-			},
-			{
-				APIGroups: []string{"snapshot.storage.k8s.io"},
-				Resources: []string{"volumesnapshotcontents"},
-				Verbs:     []string{"get", "list"},
-			},
 		},
 	}
 }
@@ -136,7 +126,7 @@ func CSIControllerClusterRoleBinding() *rbacv1.ClusterRoleBinding {
 func CSIDriver() *storagev1beta1.CSIDriver {
 	return &storagev1beta1.CSIDriver{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "csi.ics.vmware.com",
+			Name: "csi.incloudsphere.inspur.com",
 		},
 		Spec: storagev1beta1.CSIDriverSpec{
 			AttachRequired: boolPtr(true),
@@ -189,7 +179,7 @@ func ICSCSINodeDaemonSet(storageConfig *v1alpha3.CPIStorageConfig) *appsv1.Daemo
 							Name: "ics-config-volume",
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									SecretName: "csi-ics-config",
+									SecretName: "ics-config-secret",
 								},
 							},
 						},
@@ -206,7 +196,7 @@ func ICSCSINodeDaemonSet(storageConfig *v1alpha3.CPIStorageConfig) *appsv1.Daemo
 							Name: "plugin-dir",
 							VolumeSource: corev1.VolumeSource{
 								HostPath: &corev1.HostPathVolumeSource{
-									Path: "/var/lib/kubelet/plugins/csi.ics.vmware.com/",
+									Path: "/var/lib/kubelet/plugins/csi.incloudsphere.inspur.com/",
 									Type: newHostPathType(string(corev1.HostPathDirectoryOrCreate)),
 								},
 							},
@@ -245,7 +235,7 @@ func NodeDriverRegistrarContainer(image string) corev1.Container {
 					Command: []string{
 						"/bin/sh",
 						"-c",
-						"rm -rf /registration/csi.ics.vmware.com-reg.sock /csi/csi.sock",
+						"rm -rf /registration/csi.incloudsphere.inspur.com /csi/csi.sock",
 					},
 				},
 			},
@@ -262,7 +252,7 @@ func NodeDriverRegistrarContainer(image string) corev1.Container {
 			},
 			{
 				Name:  "DRIVER_REG_SOCK_PATH",
-				Value: "/var/lib/kubelet/plugins/csi.ics.vmware.com/csi.sock",
+				Value: "/var/lib/kubelet/plugins/csi.incloudsphere.inspur.com/csi.sock",
 			},
 		},
 		SecurityContext: &corev1.SecurityContext{
@@ -300,7 +290,7 @@ func ICSCSINodeContainer(image string) corev1.Container {
 			},
 			{
 				Name:  "ICS_CSI_CONFIG",
-				Value: "/etc/cloud/csi-ics.conf",
+				Value: "/etc/ics/icsphere-csi.conf",
 			},
 			{
 				Name:  "LOGGER_LEVEL",
@@ -348,7 +338,7 @@ func ICSCSINodeContainer(image string) corev1.Container {
 		VolumeMounts: []corev1.VolumeMount{
 			{
 				Name:      "ics-config-volume",
-				MountPath: "/etc/cloud",
+				MountPath: "/etc/ics",
 			},
 			{
 				Name:      "plugin-dir",
@@ -430,7 +420,7 @@ func CSIControllerDeployment(storageConfig *v1alpha3.CPIStorageConfig) *appsv1.D
 							Name: "ics-config-volume",
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
-									SecretName: "csi-ics-config",
+									SecretName: "ics-config-secret",
 								},
 							},
 						},
@@ -438,7 +428,7 @@ func CSIControllerDeployment(storageConfig *v1alpha3.CPIStorageConfig) *appsv1.D
 							Name: "socket-dir",
 							VolumeSource: corev1.VolumeSource{
 								HostPath: &corev1.HostPathVolumeSource{
-									Path: "/var/lib/csi/sockets/pluginproxy/csi.ics.vmware.com",
+									Path: "/var/lib/csi/sockets/pluginproxy/csi.incloudsphere.inspur.com",
 									Type: newHostPathType(string(corev1.HostPathDirectoryOrCreate)),
 								},
 							},
@@ -454,7 +444,7 @@ func CSIAttacherContainer(image string) corev1.Container {
 	return corev1.Container{
 		Name:  "csi-attacher",
 		Image: image,
-		Args:  []string{"--v=4", "--timeout=300s", "--csi-address=$(ADDRESS)", "--leader-election"},
+		Args:  []string{"--v=5", "--timeout=300s", "--csi-address=$(ADDRESS)", "--leader-election"},
 		Env: []corev1.EnvVar{
 			{
 				Name:  "ADDRESS",
@@ -477,7 +467,7 @@ func ICSCSIControllerContainer(image string) corev1.Container {
 		Lifecycle: &corev1.Lifecycle{
 			PreStop: &corev1.Handler{
 				Exec: &corev1.ExecAction{
-					Command: []string{"/bin/sh", "-c", "rm -rf /var/lib/csi/sockets/pluginproxy/csi.ics.vmware.com"},
+					Command: []string{"/bin/sh", "-c", "rm -rf /var/lib/csi/sockets/pluginproxy/csi.incloudsphere.inspur.com"},
 				},
 			},
 		},
@@ -511,7 +501,7 @@ func ICSCSIControllerContainer(image string) corev1.Container {
 			},
 			{
 				Name:  "ICS_CSI_CONFIG",
-				Value: "/etc/cloud/csi-ics.conf",
+				Value: "/etc/ics/icsphere-csi.conf",
 			},
 			{
 				Name:  "LOGGER_LEVEL",
@@ -524,7 +514,7 @@ func ICSCSIControllerContainer(image string) corev1.Container {
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			{
-				MountPath: "/etc/cloud",
+				MountPath: "/etc/ics",
 				Name:      "ics-config-volume",
 				ReadOnly:  true,
 			},
@@ -572,12 +562,12 @@ func ICSSyncerContainer(image string) corev1.Container {
 			},
 			{
 				Name:  "ICS_CSI_CONFIG",
-				Value: "/etc/cloud/csi-ics.conf",
+				Value: "/etc/ics/icsphere-csi.conf",
 			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			{
-				MountPath: "/etc/cloud",
+				MountPath: "/etc/ics",
 				Name:      "ics-config-volume",
 				ReadOnly:  true,
 			},
@@ -590,7 +580,7 @@ func CSIProvisionerContainer(image string) corev1.Container {
 		Name:  "csi-provisioner",
 		Image: image,
 		Args: []string{
-			"--v=4",
+			"--v=5",
 			"--timeout=300s",
 			"--csi-address=$(ADDRESS)",
 			"--feature-gates=Topology=true",
@@ -616,12 +606,12 @@ func CSIProvisionerContainer(image string) corev1.Container {
 func CSICloudConfigSecret(data string) *corev1.Secret {
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "csi-ics-config",
+			Name:      "ics-config-secret",
 			Namespace: CSINamespace,
 		},
 		Type: corev1.SecretTypeOpaque,
 		StringData: map[string]string{
-			"csi-ics.conf": data,
+			"icsphere-csi.conf": data,
 		},
 	}
 }
