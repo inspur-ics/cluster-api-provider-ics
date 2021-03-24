@@ -235,7 +235,7 @@ func NodeDriverRegistrarContainer(image string) corev1.Container {
 					Command: []string{
 						"/bin/sh",
 						"-c",
-						"rm -rf /registration/csi.incloudsphere.inspur.com /csi/csi.sock",
+						"rm -rf /registration/csi.incloudsphere.inspur.com /csi/csi.sock /var/lib/kubelet/plugins/csi.incloudsphere.inspur.com/csi.sock",
 					},
 				},
 			},
@@ -275,6 +275,7 @@ func ICSCSINodeContainer(image string) corev1.Container {
 	return corev1.Container{
 		Name:  "ics-csi-node",
 		Image: image,
+		Args:  []string{"--v=5"},
 		Env: []corev1.EnvVar{
 			{
 				Name:  "CSI_ENDPOINT",
@@ -289,7 +290,7 @@ func ICSCSINodeContainer(image string) corev1.Container {
 				Value: "false",
 			},
 			{
-				Name:  "ICS_CSI_CONFIG",
+				Name:  "ICSPHERE_CSI_CONFIG",
 				Value: "/etc/ics/icsphere-csi.conf",
 			},
 			{
@@ -464,6 +465,7 @@ func ICSCSIControllerContainer(image string) corev1.Container {
 	return corev1.Container{
 		Name:  CSIControllerName,
 		Image: image,
+		Args:  []string{"--v=5"},
 		Lifecycle: &corev1.Lifecycle{
 			PreStop: &corev1.Handler{
 				Exec: &corev1.ExecAction{
@@ -500,7 +502,7 @@ func ICSCSIControllerContainer(image string) corev1.Container {
 				Value: "controller",
 			},
 			{
-				Name:  "ICS_CSI_CONFIG",
+				Name:  "ICSPHERE_CSI_CONFIG",
 				Value: "/etc/ics/icsphere-csi.conf",
 			},
 			{
@@ -548,12 +550,13 @@ func LivenessProbeForCSIControllerContainer(image string) corev1.Container {
 
 func ICSSyncerContainer(image string) corev1.Container {
 	return corev1.Container{
-		Name:  "ics-syncer",
+		Name:  "ics-csi-syncer",
 		Image: image,
-		Args:  []string{"--leader-election"},
+		//Args:  []string{"--leader-election"},
+		Args: []string{"--v=5"},
 		Env: []corev1.EnvVar{
 			{
-				Name:  "X_CSI_FULL_SYNC_INTERVAL_MINUTES",
+				Name:  "FULL_SYNC_INTERVAL_MINUTES",
 				Value: "30",
 			},
 			{
@@ -561,7 +564,7 @@ func ICSSyncerContainer(image string) corev1.Container {
 				Value: "PRODUCTION",
 			},
 			{
-				Name:  "ICS_CSI_CONFIG",
+				Name:  "ICSPHERE_CSI_CONFIG",
 				Value: "/etc/ics/icsphere-csi.conf",
 			},
 		},
@@ -585,8 +588,8 @@ func CSIProvisionerContainer(image string) corev1.Container {
 			"--csi-address=$(ADDRESS)",
 			"--feature-gates=Topology=true",
 			"--strict-topology",
-			"--enable-leader-election",
-			"--leader-election-type=leases",
+			//"--enable-leader-election",
+			//"--leader-election-type=leases",
 		},
 		Env: []corev1.EnvVar{
 			{
