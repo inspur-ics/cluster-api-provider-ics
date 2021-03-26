@@ -32,10 +32,10 @@ spec:
     name: capics
   virtualMachineConfiguration:
     cloneMode: linkedClone
+    cluster: '${ ICS_CLUSTER }'
     datacenter: '${ ICS_DATACENTER }'
     datastore: '${ ICS_DATASTORE }'
     diskGiB: 25
-    cluster: '${ ICS_CLUSTER }'
     memoryMiB: 8192
     network:
       devices:
@@ -63,20 +63,20 @@ spec:
       cloud:
         controllerImage: gcr.io/cloud-provider-ics/cpi/release/manager:v1.0.0
       storage:
-        attacherImage: quay.io/k8scsi/csi-attacher:v2.0.0
-        controllerImage: gcr.io/cloud-provider-ics/csi/release/driver:v2.0.0
+        attacherImage: quay.io/k8scsi/csi-attacher:v1.1.1
+        controllerImage: ics-csi-driver:latest
         livenessProbeImage: quay.io/k8scsi/livenessprobe:v1.1.0
-        metadataSyncerImage: gcr.io/cloud-provider-ics/csi/release/syncer:v2.0.0
-        nodeDriverImage: gcr.io/cloud-provider-ics/csi/release/driver:v2.0.0
-        provisionerImage: quay.io/k8scsi/csi-provisioner:v1.4.0
-        registrarImage: quay.io/k8scsi/csi-node-driver-registrar:v1.2.0
+        metadataSyncerImage: ics-csi-syncer:latest
+        nodeDriverImage: ics-csi-driver:latest
+        provisionerImage: quay.io/k8scsi/csi-provisioner:v1.2.2
+        registrarImage: quay.io/k8scsi/csi-node-driver-registrar:v1.1.0
     virtualCenter:
       ${ ICS_SERVER }:
         datacenters: '${ ICS_DATACENTER }'
     workspace:
+      cluster: '${ ICS_CLUSTER }'
       datacenter: '${ ICS_DATACENTER }'
       datastore: '${ ICS_DATASTORE }'
-      cluster: '${ ICS_CLUSTER }'
       resourcePool: '${ ICS_RESOURCE_POOL }'
       server: '${ ICS_SERVER }'
   loadBalancerRef:
@@ -94,10 +94,10 @@ spec:
   template:
     spec:
       cloneMode: linkedClone
+      cluster: '${ ICS_CLUSTER }'
       datacenter: '${ ICS_DATACENTER }'
       datastore: '${ ICS_DATASTORE }'
       diskGiB: 25
-      cluster: '${ ICS_CLUSTER }'
       memoryMiB: 8192
       network:
         devices:
