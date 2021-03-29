@@ -303,6 +303,9 @@ const (
 
 // VirtualMachine represents data about a ics virtual machine object.
 type VirtualMachine struct {
+	// UID is the VM's ID.
+	UID string `json:"UID"`
+
 	// Name is the VM's name.
 	Name string `json:"name"`
 

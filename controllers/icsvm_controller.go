@@ -134,14 +134,17 @@ func (r vmReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result, reterr error) 
 		}
 		return reconcile.Result{}, err
 	}
+	r.Logger.Info("#####wyc####", "icsVM", icsVM)
 
 	// Get or create an authenticated session to the ics endpoint.
 	authSession, err := session.GetOrCreate(r.Context,
 		icsVM.Spec.Server, icsVM.Spec.Datacenter,
 		r.ControllerManagerContext.Username, r.ControllerManagerContext.Password)
 	if err != nil {
+		r.Logger.Info("#####wyc####session.GetOrCreate", "err", err)
 		return reconcile.Result{}, errors.Wrap(err, "failed to create ics session")
 	}
+	r.Logger.Info("#####wyc####session.GetOrCreate", "token", authSession.Client.Authorization)
 
 	// Create the patch helper.
 	patchHelper, err := patch.NewHelper(icsVM, r.Client)
@@ -163,12 +166,6 @@ func (r vmReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result, reterr error) 
 		PatchHelper:       patchHelper,
 	}
 
-	//template, err := r.reconcileTemplate(vmContext)
-	//if err != nil {
-	//	return reconcile.Result{}, err
-	//}
-	//vmContext.Template = template
-
 	// Print the task-ref upon entry and upon exit.
 	vmContext.Logger.V(4).Info(
 		"ICSVM.Status.TaskRef OnEntry",
@@ -189,6 +186,7 @@ func (r vmReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result, reterr error) 
 			}
 			vmContext.Logger.Error(err, "patch failed", "vm", vmContext.String())
 		}
+		r.Logger.Info("#####wyc####vmContext.Patch()", "ICSVM", vmContext.String())
 
 		// localObj is a deep copy of the ICSVM resource that was
 		// fetched at the top of this Reconcile function.
@@ -217,6 +215,7 @@ func (r vmReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result, reterr error) 
 			// the Status for localObj and remoteObj should be the same.
 			remoteObj := &infrav1.ICSVM{}
 			if err := vmContext.Client.Get(vmContext, req.NamespacedName, remoteObj); err != nil {
+				r.Logger.Info("#####wyc####PollImmediateInfinite", "err", err)
 				if apierrors.IsNotFound(err) {
 					// It's possible that the remote resource cannot be found
 					// because it has been removed. Do not error, just exit.
@@ -228,6 +227,7 @@ func (r vmReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result, reterr error) 
 				vmContext.Logger.Error(err, "failed to get ICSVM while exiting reconcile")
 				return false, nil
 			}
+			r.Logger.Info("#####wyc####PollImmediateInfinite", "remoteObj", remoteObj)
 			// If the remote resource version is not the same as the local
 			// resource version, then it means we were able to get a resource
 			// newer than the one we already had.
@@ -258,6 +258,8 @@ func (r vmReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result, reterr error) 
 				"remote-resource-version", remoteObj.ResourceVersion)
 			return false, nil
 		})
+
+		r.Logger.Info("#####wyc#### wait.PollImmediateInfinite")
 	}()
 
 	cluster, err := clusterutilv1.GetClusterFromMetadata(r.ControllerContext, r.Client, icsVM.ObjectMeta)
@@ -268,6 +270,7 @@ func (r vmReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result, reterr error) 
 			return reconcile.Result{}, nil
 		}
 	}
+	r.Logger.Info("#####wyc####", "cluster", cluster)
 
 	// Handle deleted machines
 	if !icsVM.ObjectMeta.DeletionTimestamp.IsZero() {
@@ -284,10 +287,13 @@ func (r vmReconciler) reconcileDelete(ctx *context.VMContext) (reconcile.Result,
 	//Implement selection of VM service based on ics version
 	var vmService services.VirtualMachineService = &infrast.VMService{}
 
+	r.Logger.Info("#####wyc####vmService.DestroyVM starting...", "ctx", ctx.String())
 	vm, err := vmService.DestroyVM(ctx)
 	if err != nil {
+		r.Logger.Info("#####wyc####vmService.DestroyVM", "err", err)
 		return reconcile.Result{}, errors.Wrapf(err, "failed to destroy VM")
 	}
+	r.Logger.Info("#####wyc####vmService.DestroyVM end", "vm", vm)
 
 	// Requeue the operation until the VM is "notfound".
 	if vm.State != infrav1.VirtualMachineStateNotFound {
@@ -302,6 +308,7 @@ func (r vmReconciler) reconcileDelete(ctx *context.VMContext) (reconcile.Result,
 }
 
 func (r vmReconciler) reconcileNormal(ctx *context.VMContext) (reconcile.Result, error) {
+	r.Logger.Info("#####wyc#### reconcileNormal, starting....")
 
 	if ctx.ICSVM.Status.FailureReason != nil || ctx.ICSVM.Status.FailureMessage != nil {
 		r.Logger.Info("VM is failed, won't reconcile", "namespace", ctx.ICSVM.Namespace, "name", ctx.ICSVM.Name)
@@ -316,6 +323,7 @@ func (r vmReconciler) reconcileNormal(ctx *context.VMContext) (reconcile.Result,
 	// Get or create the VM.
 	vm, err := vmService.ReconcileVM(ctx)
 	if err != nil {
+		r.Logger.Info("#####wyc####ReconcileVM", "err", err)
 		return reconcile.Result{}, errors.Wrapf(err, "failed to reconcile VM")
 	}
 
@@ -326,6 +334,16 @@ func (r vmReconciler) reconcileNormal(ctx *context.VMContext) (reconcile.Result,
 			"expected-vm-state", infrav1.VirtualMachineStateReady,
 			"actual-vm-state", vm.State)
 		return reconcile.Result{}, nil
+	}
+
+	// Update the ICSVM's Spec UID.
+	ctx.Logger.Info("vm id", "uid", vm.UID)
+
+	// defensive check to ensure we are not removing the UID
+	if vm.UID != "" {
+		ctx.ICSVM.Spec.UID = vm.UID
+	} else {
+		return reconcile.Result{}, errors.Errorf("vm id is empty while VM is ready")
 	}
 
 	// Update the ICSVM's BIOS UUID.

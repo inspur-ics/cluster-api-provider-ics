@@ -27,6 +27,7 @@ import (
 	infrav1 "github.com/inspur-ics/cluster-api-provider-ics/api/v1alpha3"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/infrastructure/net"
+	taskapi "github.com/inspur-ics/ics-go-sdk/task"
 	vmapi "github.com/inspur-ics/ics-go-sdk/vm"
 )
 
@@ -39,6 +40,7 @@ type VMService struct{}
 //   3. Powering on the VM, and finally...
 //   4. Returning the real-time state of the VM to the caller
 func (vms *VMService) ReconcileVM(ctx *context.VMContext) (vm infrav1.VirtualMachine, _ error) {
+	ctx.Logger.Info("#####wyc#### ReconcileVM Starting...")
 
 	// Initialize the result.
 	vm = infrav1.VirtualMachine{
@@ -61,22 +63,13 @@ func (vms *VMService) ReconcileVM(ctx *context.VMContext) (vm infrav1.VirtualMac
 	// Before going further, we need the VM's managed object reference.
 	vmRef, err := findVM(ctx)
 	if err != nil {
-		if !isNotFound(err) {
-			return vm, err
-		}
-
-		//// If the machine was not found by BIOS UUID it means that it got deleted from icenter directly
-		//if wasNotFoundByBIOSUUID(err) {
-		//	ctx.ICSVM.Status.FailureReason = capierrors.MachineStatusErrorPtr(capierrors.UpdateMachineError)
-		//	ctx.ICSVM.Status.FailureMessage = pointer.StringPtr(fmt.Sprintf("Unable to find VM by BIOS UUID %s. The vm was removed from infra", ctx.ICSVM.Spec.BiosUUID))
-		//	return vm, err
-		//}
+		ctx.Logger.Info("#####wyc####findVM(ctx)", "err", err)
 
 		// Otherwise, this is a new machine and the  the VM should be created.
-
 		// Create the VM.
 		return vm, createVM(ctx)
 	}
+	ctx.Logger.Info("#####wyc#### findVM end", "vmRef", vmRef.Value)
 
 	//
 	// At this point we know the VM exists, so it needs to be updated.
@@ -112,6 +105,7 @@ func (vms *VMService) ReconcileVM(ctx *context.VMContext) (vm infrav1.VirtualMac
 		return vm, err
 	}
 
+	ctx.Logger.Info("ReconcileVM end")
 	vm.State = infrav1.VirtualMachineStateReady
 	return vm, nil
 }
@@ -139,6 +133,7 @@ func (vms *VMService) DestroyVM(ctx *context.VMContext) (infrav1.VirtualMachine,
 	// Before going further, we need the VM's managed object reference.
 	vmRef, err := findVM(ctx)
 	if err != nil {
+		ctx.Logger.Info("#####wyc####vmRef, err := findVM(ctx)", "err", err)
 		// If the VM's MoRef could not be found then the VM no longer exists. This
 		// is the desired state.
 		if isNotFound(err) {
@@ -147,6 +142,7 @@ func (vms *VMService) DestroyVM(ctx *context.VMContext) (infrav1.VirtualMachine,
 		}
 		return vm, err
 	}
+	ctx.Logger.Info("#####wyc####vmRef, err := findVM(ctx)", "vmRef", vmRef)
 
 	//
 	// At this point we know the VM exists, so it needs to be destroyed.
@@ -163,11 +159,15 @@ func (vms *VMService) DestroyVM(ctx *context.VMContext) (infrav1.VirtualMachine,
 	// Power off the VM.
 	powerState, err := vms.getPowerState(vmCtx)
 	if err != nil {
+		ctx.Logger.Info("#####wyc####vms.getPowerState(vmCtx)", "err", err)
 		return vm, err
 	}
+	ctx.Logger.Info("#####wyc####vms.getPowerState(vmCtx)", "powerState", powerState)
 	if powerState == infrav1.VirtualMachinePowerStatePoweredOn {
+		ctx.Logger.Info("#####wyc####vms.PowerOffVM(ctx, vmRef.Value) starting...", "vmRef", vmRef)
 		task, err := vmCtx.Obj.PowerOffVM(ctx, vmRef.Value)
 		if err != nil {
+			ctx.Logger.Info("#####wyc####vms.PowerOffVM(ctx, vmRef.Value)", "error", err)
 			return vm, err
 		}
 		ctx.ICSVM.Status.TaskRef = task.TaskId
@@ -178,16 +178,19 @@ func (vms *VMService) DestroyVM(ctx *context.VMContext) (infrav1.VirtualMachine,
 	// Clear IPAddresses
 	err = vms.reconcileDeleteIPAddress(ctx)
 	if err != nil {
+		ctx.Logger.Info("#####wyc####vms.reconcileDeleteIPAddress(ctx)", "err", err)
 		return vm, nil
 	}
 
 	// At this point the VM is not powered on and can be destroyed. Store the
 	// destroy task's reference and return a requeue error.
-	ctx.Logger.Info("destroying vm")
+	ctx.Logger.Info("destroying vm", "vmRef", vmRef)
 	task, err := vmCtx.Obj.DeleteVM(ctx, vmRef.Value, true, true)
 	if err != nil {
+		ctx.Logger.Info("#####wyc####vmCtx.Obj.DeleteVM", "err", err)
 		return vm, err
 	}
+	ctx.Logger.Info("#####wyc####vmCtx.Obj.DeleteVM", "task", task)
 	ctx.ICSVM.Status.TaskRef = task.TaskId
 	ctx.Logger.Info("wait for VM to be destroyed")
 	return vm, nil
@@ -208,12 +211,6 @@ func (vms *VMService) reconcileMetadata(ctx *virtualMachineContext, newMetadata 
 		return false, err
 	}
 
-	//TODO [WYC] Deprecated
-	//newMetadata, err := util.GetMachineMetadata(ctx.ICSVM.Name, *ctx.ICSVM, ctx.State.Network...)
-	//if err != nil {
-	//	return false, err
-	//}
-
 	// If the metadata is the same then return early.
 	if string(newMetadata) == existingMetadata {
 		return true, nil
@@ -226,7 +223,7 @@ func (vms *VMService) reconcileMetadata(ctx *virtualMachineContext, newMetadata 
 	}
 
 	ctx.ICSVM.Status.TaskRef = taskRef
-	ctx.Logger.Info("wait for VM metadata to be updated")
+	ctx.Logger.Info("VM metadata to be updated")
 	return false, nil
 }
 
@@ -265,14 +262,18 @@ func (vms *VMService) reconcileUUID(ctx *virtualMachineContext) {
 	if err != nil {
 		return
 	}
+	ctx.State.UID = vm.ID
 	ctx.State.BiosUUID = vm.UUID
 }
 
 func (vms *VMService) getPowerState(ctx *virtualMachineContext) (infrav1.VirtualMachinePowerState, error) {
+	ctx.Logger.Info("#####wyc####ctx.Obj.GetVM starting...", "Ref", ctx.Ref.Value)
 	vmObj, err := ctx.Obj.GetVM(ctx, ctx.Ref.Value)
 	if err != nil {
+		ctx.Logger.Info("#####wyc####ctx.Obj.GetVM", "err", err)
 		return "", err
 	}
+	ctx.Logger.Info("#####wyc####ctx.Obj.GetVM", "Status", vmObj.Status)
 
 	switch vmObj.Status {
 	case "STARTED":
@@ -323,6 +324,10 @@ func (vms *VMService) setMetadata(ctx *virtualMachineContext, metadata []byte) (
 	if err != nil {
 		return "", errors.Wrapf(err, "unable to set metadata on vm %s", ctx)
 	}
+
+	// Wait for the VM to be edited.
+	taskService := taskapi.NewTaskService(ctx.Session.Client)
+	_, _ = taskService.WaitForResult(ctx, task)
 
 	return task.TaskId, nil
 }
@@ -375,8 +380,10 @@ func (vms *VMService) reconcileDeleteIPAddress(ctx *context.VMContext) error {
 		ctrlclient.MatchingFields{"spec.vmRef.name": ctx.ICSVM.GetName()},
 	)
 	if err != nil {
+		ctx.Logger.Info("#####wyc####reconcileDeleteIPAddress", "err", err)
 		return err
 	}
+	ctx.Logger.Info("#####wyc####reconcileDeleteIPAddress", "ipAddresses", ipAddresses)
 	if ipAddresses.Items != nil {
 		for _, ipAddress := range ipAddresses.Items {
 			// If the IPAddress was found and it's not already enqueued for
@@ -384,6 +391,7 @@ func (vms *VMService) reconcileDeleteIPAddress(ctx *context.VMContext) error {
 			if err := ctx.Client.Delete(ctx, ipAddress.DeepCopy()); err != nil {
 				return err
 			}
+			ctx.Logger.Info("#####wyc####IPAddress Delete", "ipAddress", ipAddress)
 		}
 
 		// Go ahead and return here since the deletion of the ICSVM resource

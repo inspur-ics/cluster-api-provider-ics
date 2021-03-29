@@ -45,6 +45,13 @@ type ICSVMSpec struct {
 	// this CRD as unstructured data.
 	// +optional
 	BiosUUID string `json:"biosUUID,omitempty"`
+
+	// UID is the the VM's ID that is assigned at runtime after
+	// the VM has been created.
+	// This field is required at runtime for other controllers that read
+	// this CRD as unstructured data.
+	// +optional
+	UID string `json:"UID,omitempty"`
 }
 
 // ICSVMStatus defines the observed state of ICSVM
