@@ -58,8 +58,10 @@ func GetNetworkStatus(
 	virtualMachineService := vmapi.NewVirtualMachineService(client)
 	vm, err := virtualMachineService.GetVM(ctx, moRef.Value)
 	if err != nil {
+		ctx.Logger.Error(err, "vm GetNetworkStatus err", "id", moRef)
 		return nil, errors.Wrapf(err, "unable to get vm info, for vm %v", moRef)
 	}
+	ctx.Logger.Info("vm GetNetworkStatus info", "vm", vm)
 	if vm.Nics == nil {
 		return nil, errors.New("vm nics hardware device is nil")
 	}
@@ -67,7 +69,7 @@ func GetNetworkStatus(
 	var allNetStatus []NetworkStatus
 	for _, nic := range vm.Nics {
 		mac := nic.Mac
-		ip := nic.IP
+		ip := nic.AdvancedNetIP
 		if &mac != nil {
 			netStatus := NetworkStatus{
 				MACAddr: nic.Mac,
@@ -76,7 +78,7 @@ func GetNetworkStatus(
 			}
 			if &ip != nil {
 				_ = syncIPPool(ctx, nic)
-				netStatus.IPAddrs = []string{ nic.IP }
+				netStatus.IPAddrs = []string{ ip.(string) }
 				if strings.Compare("UP", nic.Status) == 0 {
 					netStatus.Connected = true
 				}

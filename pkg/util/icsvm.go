@@ -80,6 +80,15 @@ func ReconcileIPAddress(
 
 	return ipAddress, nil
 }
+func UpdateNetworkInfo(ctx *context.VMContext, networkStatus []infrav1.NetworkStatus) {
+	ctx.ICSVM.Status.Network = networkStatus
+	ipAddresses := make([]string, 0, len(networkStatus))
+	for _, netStatus := range ctx.ICSVM.Status.Network {
+		ipAddresses = append(ipAddresses, netStatus.IPAddrs...)
+	}
+	ctx.Logger.Info("vm ip addresses", "Addresses", ipAddresses)
+	ctx.ICSVM.Status.Addresses = ipAddresses
+}
 
 //// GetOwnerClusterName returns the Cluster object owning the current resource.
 //func GetOwnerClusterName(obj metav1.ObjectMeta) *string {

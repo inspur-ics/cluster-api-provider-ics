@@ -49,6 +49,7 @@ import (
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services"
 	infrast "github.com/inspur-ics/cluster-api-provider-ics/pkg/services/infrastructure"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/infrastructure/session"
+	infrautilv1 "github.com/inspur-ics/cluster-api-provider-ics/pkg/util"
 )
 
 // +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=icsvms,verbs=get;list;watch;create;update;patch;delete
@@ -367,12 +368,14 @@ func (r vmReconciler) reconcileNormal(ctx *context.VMContext) (reconcile.Result,
 }
 
 func (r vmReconciler) reconcileNetwork(ctx *context.VMContext, vm infrav1.VirtualMachine) {
-	ctx.ICSVM.Status.Network = vm.Network
-	ipAddrs := make([]string, 0, len(vm.Network))
-	for _, netStatus := range ctx.ICSVM.Status.Network {
-		ipAddrs = append(ipAddrs, netStatus.IPAddrs...)
-	}
-	ctx.ICSVM.Status.Addresses = ipAddrs
+	//ctx.ICSVM.Status.Network = vm.Network
+	//ipAddresses := make([]string, 0, len(vm.Network))
+	//for _, netStatus := range ctx.ICSVM.Status.Network {
+	//	ipAddresses = append(ipAddresses, netStatus.IPAddrs...)
+	//}
+	//ctx.Logger.Info("vm ip addresses", "Addresses", ipAddresses)
+	//ctx.ICSVM.Status.Addresses = ipAddresses
+	infrautilv1.UpdateNetworkInfo(ctx, vm.Network)
 }
 
 func (r *vmReconciler) clusterToICSVMs(a handler.MapObject) []reconcile.Request {

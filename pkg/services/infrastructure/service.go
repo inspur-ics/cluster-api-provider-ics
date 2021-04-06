@@ -18,8 +18,9 @@ package infrastructure
 
 import (
 	"encoding/base64"
-	"github.com/pkg/errors"
+	"time"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -27,6 +28,7 @@ import (
 	infrav1 "github.com/inspur-ics/cluster-api-provider-ics/api/v1alpha3"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/infrastructure/net"
+	infrautilv1 "github.com/inspur-ics/cluster-api-provider-ics/pkg/util"
 	taskapi "github.com/inspur-ics/ics-go-sdk/task"
 	vmapi "github.com/inspur-ics/ics-go-sdk/vm"
 )
@@ -85,6 +87,11 @@ func (vms *VMService) ReconcileVM(ctx *context.VMContext) (vm infrav1.VirtualMac
 
 	vms.reconcileUUID(vmCtx)
 
+	//TODO [WYC] check network business
+	if err := vms.reconcileNetworkStatus(vmCtx); err != nil {
+		return vm, err
+	}
+
 	// Get the bootstrap data.
 	bootstrapData, err := vms.getBootstrapData(ctx)
 	if err != nil {
@@ -97,11 +104,6 @@ func (vms *VMService) ReconcileVM(ctx *context.VMContext) (vm infrav1.VirtualMac
 	}
 
 	if ok, err := vms.reconcilePowerState(vmCtx); err != nil || !ok {
-		return vm, err
-	}
-
-	//TODO [WYC] check network business
-	if err := vms.reconcileNetworkStatus(vmCtx); err != nil {
 		return vm, err
 	}
 
@@ -176,11 +178,11 @@ func (vms *VMService) DestroyVM(ctx *context.VMContext) (infrav1.VirtualMachine,
 	}
 
 	// Clear IPAddresses
-	err = vms.reconcileDeleteIPAddress(ctx)
-	if err != nil {
-		ctx.Logger.Info("#####wyc####vms.reconcileDeleteIPAddress(ctx)", "err", err)
-		return vm, nil
-	}
+	//err = vms.reconcileDeleteIPAddress(ctx)
+	//if err != nil {
+	//	ctx.Logger.Info("#####wyc####vms.reconcileDeleteIPAddress(ctx)", "err", err)
+	//	return vm, nil
+	//}
 
 	// At this point the VM is not powered on and can be destroyed. Store the
 	// destroy task's reference and return a requeue error.
@@ -197,11 +199,24 @@ func (vms *VMService) DestroyVM(ctx *context.VMContext) (infrav1.VirtualMachine,
 }
 
 func (vms *VMService) reconcileNetworkStatus(ctx *virtualMachineContext) error {
+	ctx.Logger.Info("reconciling reconcileNetworkStatus staring...")
 	netStatus, err := vms.getNetworkStatus(ctx)
 	if err != nil {
+		ctx.Logger.Info("reconciling reconcileNetworkStatus ended", "err", err)
 		return err
 	}
 	ctx.State.Network = netStatus
+	if len(netStatus) >= 1 {
+		if ctx.ICSVM.Status.Addresses == nil && netStatus[0].IPAddrs != nil {
+			infrautilv1.UpdateNetworkInfo(&ctx.VMContext, netStatus)
+			err = ctx.Patch()
+			if err != nil {
+				ctx.Logger.Error(err, "ICSVM Path IPAddress Error")
+			}
+			ctx.Logger.Info("ICSVM Path IPAddress", "netStatus", netStatus)
+		}
+	}
+	ctx.Logger.Info("reconciling reconcileNetworkStatus ended", "netStatus", netStatus)
 	return nil
 }
 
@@ -235,6 +250,9 @@ func (vms *VMService) reconcilePowerState(ctx *virtualMachineContext) (bool, err
 	switch powerState {
 	case infrav1.VirtualMachinePowerStatePoweredOff:
 		ctx.Logger.Info("powering on")
+		if infrautilv1.IsControlPlaneMachine(ctx.ICSVM) {
+			time.Sleep(time.Duration(2) * time.Minute)
+		}
 		task, err := ctx.Obj.PowerOnVM(ctx, ctx.Ref.Value)
 		if err != nil {
 			return false, errors.Wrapf(err, "failed to trigger power on op for vm %s", ctx)
@@ -335,9 +353,10 @@ func (vms *VMService) setMetadata(ctx *virtualMachineContext, metadata []byte) (
 func (vms *VMService) getNetworkStatus(ctx *virtualMachineContext) ([]infrav1.NetworkStatus, error) {
 	allNetStatus, err := net.GetNetworkStatus(&ctx.VMContext, ctx.Session.Client, ctx.Ref)
 	if err != nil {
+		ctx.Logger.Info("got allNetStatus", "err", err)
 		return nil, err
 	}
-	ctx.Logger.V(4).Info("got allNetStatus", "status", allNetStatus)
+	ctx.Logger.Info("got allNetStatus", "status", allNetStatus)
 	var apiNetStatus []infrav1.NetworkStatus
 	for _, s := range allNetStatus {
 		apiNetStatus = append(apiNetStatus, infrav1.NetworkStatus{
@@ -379,7 +398,7 @@ func (vms *VMService) reconcileDeleteIPAddress(ctx *context.VMContext) error {
 		ctrlclient.InNamespace(ctx.ICSVM.GetNamespace()),
 		ctrlclient.MatchingFields{"spec.vmRef.name": ctx.ICSVM.GetName()},
 	)
-	if err != nil {
+	if err != nil && err.Error() != "" {
 		ctx.Logger.Info("#####wyc####reconcileDeleteIPAddress", "err", err)
 		return err
 	}

@@ -497,7 +497,7 @@ func checkVMNetworkReady(nics []types.Nic) bool {
 	status := true
 	for _, nic := range nics {
 		ip := nic.IP
-		if &ip == nil {
+		if &ip != nil {
 			status = false
 			break
 		}
