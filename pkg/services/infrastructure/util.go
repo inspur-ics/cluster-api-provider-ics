@@ -54,11 +54,9 @@ func sanitizeIPAddrs(ctx *context.VMContext, ipAddrs []string) []string {
 //   3. If it is not found by instance UUID, fallback to an inventory path search
 //      using the vm cluster path and the ICSVM name
 func findVM(ctx *context.VMContext) (types.ManagedObjectReference, error) {
-	ctx.Logger.Info("#####wyc#### findVM start....")
 	virtualMachineService := vmapi.NewVirtualMachineService(ctx.Session.Client)
 	if biosUUID := ctx.ICSVM.Spec.BiosUUID; biosUUID != "" {
 		objRef, err := virtualMachineService.GetVMByUUID(ctx, biosUUID)
-		ctx.Logger.Info("#####wyc#### GetVMByUUID", "biosUUID", biosUUID)
 		if err != nil {
 			return types.ManagedObjectReference{}, err
 		}
@@ -77,10 +75,9 @@ func findVM(ctx *context.VMContext) (types.ManagedObjectReference, error) {
 	objRef := &types.VirtualMachine{}
 	instanceUUID := ctx.ICSVM.Spec.UID
 	if instanceUUID != "" {
-		ctx.Logger.Info("#####wyc#### GetVM by vm id", "vm-id", instanceUUID)
 		vmObj, err := virtualMachineService.GetVM(ctx, instanceUUID)
 		if err != nil {
-			ctx.Logger.Info("#####wyc#### GetVMByName error info", "err", err)
+			ctx.Logger.Error(err,"fail to get vm by vm UUD")
 		}
 		objRef = vmObj
 	} else {
@@ -88,7 +85,6 @@ func findVM(ctx *context.VMContext) (types.ManagedObjectReference, error) {
 	}
 	if objRef == nil || objRef.ID == "" {
 		vm, err := virtualMachineService.GetVMByName(ctx, ctx.ICSVM.Name)
-		ctx.Logger.Info("#####wyc#### GetVMByName", "vm-name", ctx.ICSVM.Name)
 		if err != nil {
 			return types.ManagedObjectReference{}, errNotFound{byInventoryPath: ctx.ICSVM.Name}
 		}
@@ -117,11 +113,10 @@ func getTask(ctx *context.VMContext) *types.TaskInfo {
 	moRef := types.Task{
 		TaskId:  ctx.ICSVM.Status.TaskRef,
 	}
-	ctx.Logger.Info("#####wyc####taskService.GetTaskInfo", "moRef", moRef)
 	taskService := taskapi.NewTaskService(ctx.Session.Client)
 	obj, err := taskService.GetTaskInfo(ctx, &moRef)
 	if err != nil {
-		ctx.Logger.Info("#####wyc####taskService.GetTaskInfo", "err", err)
+		ctx.Logger.Error(err,"get ics task info error")
 		return nil
 	}
 	return obj
@@ -129,7 +124,6 @@ func getTask(ctx *context.VMContext) *types.TaskInfo {
 
 func reconcileInFlightTask(ctx *context.VMContext) (bool, error) {
 	// Check to see if there is an in-flight task.
-	ctx.Logger.Info("#####wyc####task := getTask(ctx) starting...", "icsvm-status", ctx.ICSVM.Status)
 	task := getTask(ctx)
 
 	// If no task was found then make sure to clear the ICSVM
@@ -141,23 +135,18 @@ func reconcileInFlightTask(ctx *context.VMContext) (bool, error) {
 
 	// Otherwise the course of action is determined by the state of the task.
 	logger := ctx.Logger.WithName(task.Id)
-	logger.Info("task found", "state", task.State, "description-id", task.ProcessId)
+	logger.Info("task found", "state", task.State, "task-id", task.Id)
 	switch task.State {
 	case "WAITING":
-		logger.Info("task is still pending", "description-id", task.ProcessId)
 		return true, nil
 	case "RUNNING":
-		logger.Info("task is still running", "description-id", task.ProcessId)
 		return true, nil
 	case "READY":
-		logger.Info("task is still running", "description-id", task.ProcessId)
 		return true, nil
 	case "FINISHED":
-		logger.Info("task is a success", "description-id", task.ProcessId)
 		ctx.ICSVM.Status.TaskRef = ""
 		return false, nil
 	case "ERROR":
-		logger.Info("task failed", "description-id", task.ProcessId)
 		ctx.ICSVM.Status.TaskRef = ""
 		return false, nil
 	default:
@@ -216,7 +205,6 @@ func reconcileICSVMWhenNetworkIsReady(
 }
 
 func reconcileICSVMOnTaskCompletion(ctx *context.VMContext) {
-	ctx.Logger.Info("#####wyc#### reconcileICSVMOnTaskCompletion", "icsvm-status", ctx.ICSVM.Status)
 	task := getTask(ctx)
 	if task == nil {
 		ctx.Logger.V(4).Info(
@@ -235,12 +223,10 @@ func reconcileICSVMOnTaskCompletion(ctx *context.VMContext) {
 		"task-description-id", task.ProcessId)
 
 	reconcileICSVMOnFuncCompletion(ctx, func() ([]interface{}, error) {
-		ctx.Logger.Info("#####wyc#### reconcileICSVMOnFuncCompletion start")
 		ref := types.Task{
 			TaskId: taskRef,
 		}
 		taskInfo, err := taskHelper.WaitForResult(ctx, &ref)
-		ctx.Logger.Info("#####wyc#### reconcileICSVMOnFuncCompletion")
 
 		// An error is only returned if the process of waiting for the result
 		// failed, *not* if the task itself failed.
@@ -257,7 +243,6 @@ func reconcileICSVMOnTaskCompletion(ctx *context.VMContext) {
 			"task-description-id", taskInfo.ProcessId,
 		}, nil
 	})
-	ctx.Logger.Info("#####wyc#### reconcileICSVMOnTaskCompletion end")
 }
 
 func reconcileICSVMOnFuncCompletion(

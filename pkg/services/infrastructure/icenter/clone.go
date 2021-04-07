@@ -34,7 +34,6 @@ import (
 // Clone kicks off a clone operation on vCenter to create a new virtual machine.
 // nolint:gocognit
 func Clone(ctx *context.VMContext) error {
-	ctx.Logger.Info("#####wyc#### Clone", "ICSVM", ctx.ICSVM)
 	ctx = &context.VMContext{
 		ControllerContext: ctx.ControllerContext,
 		ICSVM:             ctx.ICSVM,
@@ -45,24 +44,20 @@ func Clone(ctx *context.VMContext) error {
 	ctx.Logger.Info("starting clone process")
 
 	vmTemplate := types.VirtualMachine{}
-	ctx.Logger.Info("#####wyc####template.FindTemplate starting...", "vmTemplate", ctx.ICSVM.Spec.Template)
 	tpl, err := template.FindTemplate(ctx, ctx.ICSVM.Spec.Template)
 	if err != nil {
-		ctx.Logger.Info("#####wyc####template.FindTemplate", "err", err)
+		ctx.Logger.Error(err, "fail to find the vm template from ics")
 		return errors.Wrapf(err, "unable to get vm template for %q", ctx)
 	}
-	ctx.Logger.Info("#####wyc#### FindTemplate", "template-id", tpl.ID)
 	vmTemplate = *tpl
 	vmTemplate.Name = ctx.ICSVM.Name
 
-	ctx.Logger.Info("#####wyc####template.GetClusterByName starting...", "Cluster", ctx.ICSVM.Spec.Cluster)
 	clusterService := clusterapi.NewClusterService(ctx.Session.Client)
 	cluster, err := clusterService.GetClusterByName(ctx, ctx.ICSVM.Spec.Cluster)
 	if err != nil {
-		ctx.Logger.Info("#####wyc####clusterService.GetClusterByName", "err", err)
+		ctx.Logger.Error(err, "fail to find the cluster from ics")
 		return errors.Wrapf(err, "unable to get cluster for %q", ctx)
 	}
-	ctx.Logger.Info("#####wyc#### GetClusterByName", "cluster-id", cluster.Id)
 
 	//TODO [WYC]ics system no resource pool design
 	//pool, err := ctx.Session.Finder.ResourcePoolOrDefault(ctx, ctx.ICSVM.Spec.ResourcePool)
@@ -70,63 +65,53 @@ func Clone(ctx *context.VMContext) error {
 	//	return errors.Wrapf(err, "unable to get resource pool for %q", ctx)
 	//}
 
-	ctx.Logger.Info("#####wyc####template.GetStorageInfoByName starting...", "Datastore", ctx.ICSVM.Spec.Datastore)
 	storageService := storageapi.NewStorageService(ctx.GetSession().Client)
 	dataStore, err := storageService.GetStorageInfoByName(ctx, ctx.ICSVM.Spec.Datastore)
-	ctx.Logger.Info("#####wyc#### GetStorageInfoByName")
 	if err != nil {
-		ctx.Logger.Info("#####wyc####storageService.GetStorageInfoByName", "err", err)
+		ctx.Logger.Error(err, "fail to find the data store from ics")
 		return errors.Wrapf(err, "unable to get DataStore for %q", ctx)
 	}
 
 	networks := make(map[int]types.Network)
 	networkService := networkapi.NewNetworkService(ctx.GetSession().Client)
 	for index, device := range ctx.ICSVM.Spec.Network.Devices {
-		ctx.Logger.Info("#####wyc####template.GetNetworkByName starting...", "NetworkName", device.NetworkName)
 		network, err := networkService.GetNetworkByName(ctx, device.NetworkName)
 		if err != nil {
-			ctx.Logger.Info("#####wyc####networkService.GetNetworkByName", "err", err)
-			return errors.Wrapf(err, "unable to get cluster for %q", ctx)
+			ctx.Logger.Error(err, "fail to find the network devices from ics")
+			return errors.Wrapf(err, "unable to get networks for %q", ctx)
 		}
 		networks[index] = *network
 	}
-	ctx.Logger.Info("#####wyc#### GetNetworkByName end")
 
 	host, err := getAvailableHosts(ctx, *cluster, *dataStore, networks)
-	ctx.Logger.Info("#####wyc#### getAvailableHosts host")
 	if err != nil {
-		ctx.Logger.Info("#####wyc####getAvailableHosts", "err", err)
+		ctx.Logger.Error(err, "fail to find the host from ics")
 		return errors.Wrapf(err, "unable to get available host for %q", ctx)
 	}
-	ctx.Logger.Info("#####wyc####getAvailableHosts", "host", host)
 	vmTemplate.HostID = host.ID
 	vmTemplate.HostName = host.HostName
 	vmTemplate.HostIP = host.Name
 
 	diskSpecs, err := getDiskSpecs(dataStore, tpl.Disks)
 	if err != nil {
-		ctx.Logger.Info("#####wyc#### getDiskSpecs", "err", err)
+		ctx.Logger.Error(err, "fail to find the disk spec")
 		return errors.Wrapf(err, "error getting disk spec for %q", ctx)
 	}
-	ctx.Logger.Info("#####wyc#### getDiskSpecs", "diskSpecs", diskSpecs)
 	vmTemplate.Disks = diskSpecs
 
 	networkSpecs, err := getNetworkSpecs(ctx, tpl.Nics, networks)
 	if err != nil {
-		ctx.Logger.Info("#####wyc#### getNetworkSpecs", "err", err)
+		ctx.Logger.Error(err, "fail to find the network spec")
 		return errors.Wrapf(err, "error getting network specs for %q", ctx)
 	}
-	ctx.Logger.Info("#####wyc#### getNetworkSpecs", "networkSpecs", networkSpecs)
 	vmTemplate.Nics = networkSpecs
 
-	ctx.Logger.Info("#####wyc#### CreateVMByTemplate starting...", "vmTemplate", vmTemplate)
 	virtualMachineService := vmapi.NewVirtualMachineService(ctx.GetSession().Client)
 	task, err := virtualMachineService.CreateVMByTemplate(ctx, vmTemplate, true)
 	if err != nil {
-		ctx.Logger.Info("#####wyc#### CreateVMByTemplate", "err", err)
+		ctx.Logger.Error(err, "fail to create vm by the template")
 		return errors.Wrapf(err, "error trigging clone op for machine %s", ctx)
 	}
-	ctx.Logger.Info("#####wyc#### CreateVMByTemplate task", "task-id", task.TaskId)
 
 	ctx.ICSVM.Status.TaskRef = task.TaskId
 
@@ -136,7 +121,6 @@ func Clone(ctx *context.VMContext) error {
 	if err := ctx.Patch(); err != nil {
 		ctx.Logger.Error(err, "patch failed", "icsvm", ctx.ICSVM)
 	}
-	ctx.Logger.Info("#####wyc#### ctx.ICSVM ctx.Patch()")
 	return nil
 }
 

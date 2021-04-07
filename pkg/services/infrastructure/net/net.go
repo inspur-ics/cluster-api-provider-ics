@@ -65,6 +65,14 @@ func GetNetworkStatus(
 	if vm.Nics == nil {
 		return nil, errors.New("vm nics hardware device is nil")
 	}
+	// defensive check to ensure we are not removing the UID
+	if vm.ID != "" {
+		ctx.ICSVM.Spec.UID = vm.ID
+	}
+	// defensive check to ensure we are not removing the biosUUID
+	if vm.UUID != "" {
+		ctx.ICSVM.Spec.BiosUUID = vm.UUID
+	}
 
 	var allNetStatus []NetworkStatus
 	for _, nic := range vm.Nics {

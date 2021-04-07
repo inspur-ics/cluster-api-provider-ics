@@ -102,7 +102,7 @@ func AddHAProxyLoadBalancerControllerToManager(ctx *context.ControllerManagerCon
 		// Watch the CAPI machines that are members of the control plane which
 		// this HAProxyLoadBalancer servies.
 		Watches(
-			&source.Kind{Type: &clusterv1.Machine{}},
+			&source.Kind{Type: &infrav1.ICSMachine{}},
 			&handler.EnqueueRequestsFromMapFunc{
 				ToRequests: handler.ToRequestsFunc(reconciler.controlPlaneMachineToHAProxyLoadBalancer),
 			},
@@ -368,8 +368,19 @@ func (r haproxylbReconciler) BackEndpointsForCluster(ctx *context.HAProxyLoadBal
 			}
 		}
 
+		addresses := machine.Status.Addresses
+		if addresses == nil {
+			icsMachine, err := infrautilv1.GetICSMachine(ctx, ctx.Client, machine.Namespace,
+				machine.Spec.InfrastructureRef.Name)
+			if err != nil {
+				ctx.Logger.Error(err, "Get ICSMachine Object error.", "ref", machine.Spec.InfrastructureRef)
+			}
+			addresses = icsMachine.Status.Addresses
+		}
+		ctx.Logger.Info("Control Plane Machine IP", "addresses", addresses)
+
 		machineEndpoints := make([]corev1.EndpointAddress, 0)
-		for i, addr := range machine.Status.Addresses {
+		for i, addr := range addresses {
 			if addr.Type == clusterv1.MachineExternalIP {
 				if utilnet.IsIPv6String(addr.Address) {
 					continue
@@ -631,7 +642,7 @@ func (r haproxylbReconciler) reconcileNetwork(ctx *context.HAProxyLoadBalancerCo
 // Machine is reconciled and it has IP addresses and is a member of the same
 // control plane that the HAProxyLoadBalancer services.
 func (r haproxylbReconciler) controlPlaneMachineToHAProxyLoadBalancer(o handler.MapObject) []ctrl.Request {
-	machine, ok := o.Object.(*clusterv1.Machine)
+	machine, ok := o.Object.(*infrav1.ICSMachine)
 	if !ok {
 		r.Logger.Error(errors.New("invalid type"),
 			"Expected to receive a CAPI Machine resource",

@@ -19,6 +19,7 @@ package util
 import (
 	"bytes"
 	"context"
+	"k8s.io/klog"
 	"net"
 	"regexp"
 	"text/template"
@@ -85,7 +86,7 @@ func GetICSMachinesInCluster(
 // GetICSMachine gets a ICSMachine resource for the given CAPI Machine.
 func GetICSMachine(
 	ctx context.Context,
-	controllerClient client.Client,
+	client client.Client,
 	namespace, machineName string) (*infrav1.ICSMachine, error) {
 
 	machine := &infrav1.ICSMachine{}
@@ -93,19 +94,19 @@ func GetICSMachine(
 		Namespace: namespace,
 		Name:      machineName,
 	}
-	if err := controllerClient.Get(ctx, namespacedName, machine); err != nil {
+	klog.Infof("ICSMachine Key Ref %+v", namespacedName)
+	if err := client.Get(ctx, namespacedName, machine); err != nil {
 		return nil, err
 	}
 	return machine, nil
 }
 
 // GetOwnerICSMachine returns the ICSMachine object owning the current resource.
-func GetOwnerICSMachine(
-	ctx context.Context,
-	c client.Client, obj metav1.ObjectMeta) (*infrav1.ICSMachine, error) {
+func GetOwnerICSMachine(ctx context.Context, client client.Client, obj metav1.ObjectMeta) (*infrav1.ICSMachine, error) {
+	klog.Infof("ICSMachine Owner Ref %+v", obj)
 	for _, ref := range obj.OwnerReferences {
 		if ref.Kind == "ICSMachine" && ref.APIVersion == infrav1.GroupVersion.String() {
-			return GetICSMachine(ctx, c, obj.Namespace, ref.Name)
+			return GetICSMachine(ctx, client, obj.Namespace, ref.Name)
 		}
 	}
 	return nil, nil

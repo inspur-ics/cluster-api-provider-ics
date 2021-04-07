@@ -36,7 +36,7 @@ spec:
           spec:
             description: ICSVMSpec defines the desired state of ICSVM.
             properties:
-              UUID:
+              UID:
                 description: UID is the the VM's ID that is assigned at runtime after
                   the VM has been created. This field is required at runtime for other
                   controllers that read this CRD as unstructured data.

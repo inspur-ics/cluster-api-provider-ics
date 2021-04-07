@@ -150,7 +150,6 @@ func (r machineReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result, reterr er
 		}
 		return reconcile.Result{}, err
 	}
-	r.Logger.Info("#####wyc####", "icsMachine", icsMachine)
 
 	// Fetch the CAPI Machine.
 	machine, err := clusterutilv1.GetOwnerMachine(r, r.Client, icsMachine.ObjectMeta)
@@ -161,7 +160,6 @@ func (r machineReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result, reterr er
 		r.Logger.Info("Waiting for Machine Controller to set OwnerRef on ICSMachine")
 		return reconcile.Result{}, nil
 	}
-	r.Logger.Info("#####wyc####", "machine", machine)
 
 	// Fetch the CAPI Cluster.
 	cluster, err := clusterutilv1.GetClusterFromMetadata(r, r.Client, machine.ObjectMeta)
@@ -174,7 +172,6 @@ func (r machineReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result, reterr er
 			icsMachine.Namespace, icsMachine.Name)
 		return reconcile.Result{}, nil
 	}
-	r.Logger.Info("#####wyc####", "cluster", cluster)
 
 	// Fetch the ICSCluster
 	icsCluster := &infrav1.ICSCluster{}
@@ -186,7 +183,6 @@ func (r machineReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result, reterr er
 		r.Logger.Info("Waiting for ICSCluster")
 		return reconcile.Result{}, nil
 	}
-	r.Logger.Info("#####wyc####", "icsCluster", icsCluster)
 
 	// Create the patch helper.
 	patchHelper, err := patch.NewHelper(icsMachine, r.Client)
@@ -220,7 +216,6 @@ func (r machineReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result, reterr er
 			}
 			machineContext.Logger.Error(err, "patch failed", "machine", machineContext.String())
 		}
-		r.Logger.Info("#####wyc####machineContext.Patch()", "machine", machineContext.String())
 	}()
 
 	// Handle deleted machines
@@ -258,7 +253,6 @@ func (r machineReconciler) reconcileDeleteVMPre7(ctx *context.MachineContext) er
 		return err
 	}
 	if vm != nil && vm.GetDeletionTimestamp().IsZero() {
-		r.Logger.Info("#####wyc####reconcileDeleteVMPre7", "ICSVM", vm.Name)
 		// If the ICSVM was found and it's not already enqueued for
 		// deletion, go ahead and attempt to delete it.
 		if err := ctx.Client.Delete(ctx, vm); err != nil {
@@ -291,7 +285,6 @@ func (r machineReconciler) reconcileNormal(ctx *context.MachineContext) (reconci
 	icsVM, err := r.findVMPre7(ctx)
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			r.Logger.Info("#####wyc####findVMPre7", "err", err)
 			return reconcile.Result{}, err
 		}
 	}
@@ -299,7 +292,6 @@ func (r machineReconciler) reconcileNormal(ctx *context.MachineContext) (reconci
 		// Reconcile ICSMachine's failures
 		ctx.ICSMachine.Status.FailureReason = icsVM.Status.FailureReason
 		ctx.ICSMachine.Status.FailureMessage = icsVM.Status.FailureMessage
-		r.Logger.Info("#####wyc####findVMPre7", "icsVM", icsVM)
 	}
 
 	// If the ICSMachine is in an error state, return early.
@@ -324,7 +316,7 @@ func (r machineReconciler) reconcileNormal(ctx *context.MachineContext) (reconci
 
 	vm, err := r.reconcileNormalPre7(ctx, icsVM)
 	if err != nil {
-		r.Logger.Info("#####wyc####reconcileNormalPre7", "err", err)
+		r.Logger.Error(err,"reconcile normal error")
 		if apierrors.IsAlreadyExists(err) {
 			return reconcile.Result{}, nil
 		}
@@ -372,7 +364,6 @@ func (r machineReconciler) reconcileNormal(ctx *context.MachineContext) (reconci
 		ctx.Logger.Info("ready state is not reconciled")
 		return reconcile.Result{}, nil
 	}
-	r.Logger.Info("#####wyc####reconcileNormal", "vmObj", vmObj)
 
 	return reconcile.Result{}, nil
 }
@@ -461,13 +452,11 @@ func (r machineReconciler) reconcileNormalPre7(ctx *context.MachineContext, icsV
 			"namespace", vm.Namespace, "name", vm.Name)
 		return nil, err
 	}
-	r.Logger.Info("#####wyc####reconcileNormalPre7", "ICSVM", vm)
 
 	return vm, nil
 }
 
 func (r machineReconciler) reconcileNetwork(ctx *context.MachineContext, vm *unstructured.Unstructured) (bool, error) {
-	r.Logger.Info("#####wyc#### reconcileNetwork starting...")
 	var errs []error
 	if networkStatusListOfIfaces, ok, _ := unstructured.NestedSlice(vm.Object, "status", "network"); ok {
 		networkStatusList := []infrav1.NetworkStatus{}
@@ -512,13 +501,11 @@ func (r machineReconciler) reconcileNetwork(ctx *context.MachineContext, vm *uns
 		ctx.Logger.Info("waiting on IP addresses")
 		return false, kerrors.NewAggregate(errs)
 	}
-	r.Logger.Info("#####wyc#### reconcileNetwork end")
 
 	return true, nil
 }
 
 func (r machineReconciler) reconcileProviderID(ctx *context.MachineContext, vm *unstructured.Unstructured) (bool, error) {
-	r.Logger.Info("#####wyc#### reconcileProviderID start....")
 	biosUUID, ok, err := unstructured.NestedString(vm.Object, "spec", "biosUUID")
 	if !ok {
 		if err != nil {
@@ -556,12 +543,10 @@ func (r machineReconciler) reconcileProviderID(ctx *context.MachineContext, vm *
 		ctx.ICSMachine.Spec.ProviderID = &providerID
 		ctx.Logger.Info("updated provider ID", "provider-id", providerID)
 	}
-	r.Logger.Info("#####wyc#### reconcileProviderID ended")
 	return true, nil
 }
 
 func (r machineReconciler) reconcileReadyState(ctx *context.MachineContext, vm *unstructured.Unstructured) (bool, error) {
-	r.Logger.Info("#####wyc#### reconcileReadyState starting....")
 	ready, ok, err := unstructured.NestedBool(vm.Object, "status", "ready")
 	if !ok {
 		if err != nil {

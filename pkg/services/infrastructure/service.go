@@ -18,9 +18,9 @@ package infrastructure
 
 import (
 	"encoding/base64"
+	"github.com/pkg/errors"
 	"time"
 
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -42,8 +42,6 @@ type VMService struct{}
 //   3. Powering on the VM, and finally...
 //   4. Returning the real-time state of the VM to the caller
 func (vms *VMService) ReconcileVM(ctx *context.VMContext) (vm infrav1.VirtualMachine, _ error) {
-	ctx.Logger.Info("#####wyc#### ReconcileVM Starting...")
-
 	// Initialize the result.
 	vm = infrav1.VirtualMachine{
 		Name:  ctx.ICSVM.Name,
@@ -65,13 +63,12 @@ func (vms *VMService) ReconcileVM(ctx *context.VMContext) (vm infrav1.VirtualMac
 	// Before going further, we need the VM's managed object reference.
 	vmRef, err := findVM(ctx)
 	if err != nil {
-		ctx.Logger.Info("#####wyc####findVM(ctx)", "err", err)
+		ctx.Logger.Error(err,"fail to get vm object reference")
 
 		// Otherwise, this is a new machine and the  the VM should be created.
 		// Create the VM.
 		return vm, createVM(ctx)
 	}
-	ctx.Logger.Info("#####wyc#### findVM end", "vmRef", vmRef.Value)
 
 	//
 	// At this point we know the VM exists, so it needs to be updated.
@@ -89,6 +86,11 @@ func (vms *VMService) ReconcileVM(ctx *context.VMContext) (vm infrav1.VirtualMac
 
 	//TODO [WYC] check network business
 	if err := vms.reconcileNetworkStatus(vmCtx); err != nil {
+		return vm, err
+	}
+
+	// ICS VM exec cloud init configuration data
+	if ok, err := vms.reconcileCloudInit(vmCtx); err != nil || !ok {
 		return vm, err
 	}
 
@@ -135,7 +137,7 @@ func (vms *VMService) DestroyVM(ctx *context.VMContext) (infrav1.VirtualMachine,
 	// Before going further, we need the VM's managed object reference.
 	vmRef, err := findVM(ctx)
 	if err != nil {
-		ctx.Logger.Info("#####wyc####vmRef, err := findVM(ctx)", "err", err)
+		ctx.Logger.Error(err, "fail to get vm object reference")
 		// If the VM's MoRef could not be found then the VM no longer exists. This
 		// is the desired state.
 		if isNotFound(err) {
@@ -144,7 +146,6 @@ func (vms *VMService) DestroyVM(ctx *context.VMContext) (infrav1.VirtualMachine,
 		}
 		return vm, err
 	}
-	ctx.Logger.Info("#####wyc####vmRef, err := findVM(ctx)", "vmRef", vmRef)
 
 	//
 	// At this point we know the VM exists, so it needs to be destroyed.
@@ -161,15 +162,13 @@ func (vms *VMService) DestroyVM(ctx *context.VMContext) (infrav1.VirtualMachine,
 	// Power off the VM.
 	powerState, err := vms.getPowerState(vmCtx)
 	if err != nil {
-		ctx.Logger.Info("#####wyc####vms.getPowerState(vmCtx)", "err", err)
+		ctx.Logger.Error(err, "fail to get power state of the vm")
 		return vm, err
 	}
-	ctx.Logger.Info("#####wyc####vms.getPowerState(vmCtx)", "powerState", powerState)
 	if powerState == infrav1.VirtualMachinePowerStatePoweredOn {
-		ctx.Logger.Info("#####wyc####vms.PowerOffVM(ctx, vmRef.Value) starting...", "vmRef", vmRef)
 		task, err := vmCtx.Obj.PowerOffVM(ctx, vmRef.Value)
 		if err != nil {
-			ctx.Logger.Info("#####wyc####vms.PowerOffVM(ctx, vmRef.Value)", "error", err)
+			ctx.Logger.Error(err, "power off the vm error")
 			return vm, err
 		}
 		ctx.ICSVM.Status.TaskRef = task.TaskId
@@ -180,7 +179,6 @@ func (vms *VMService) DestroyVM(ctx *context.VMContext) (infrav1.VirtualMachine,
 	// Clear IPAddresses
 	//err = vms.reconcileDeleteIPAddress(ctx)
 	//if err != nil {
-	//	ctx.Logger.Info("#####wyc####vms.reconcileDeleteIPAddress(ctx)", "err", err)
 	//	return vm, nil
 	//}
 
@@ -189,10 +187,9 @@ func (vms *VMService) DestroyVM(ctx *context.VMContext) (infrav1.VirtualMachine,
 	ctx.Logger.Info("destroying vm", "vmRef", vmRef)
 	task, err := vmCtx.Obj.DeleteVM(ctx, vmRef.Value, true, true)
 	if err != nil {
-		ctx.Logger.Info("#####wyc####vmCtx.Obj.DeleteVM", "err", err)
+		ctx.Logger.Error(err, "fail to destroying vm")
 		return vm, err
 	}
-	ctx.Logger.Info("#####wyc####vmCtx.Obj.DeleteVM", "task", task)
 	ctx.ICSVM.Status.TaskRef = task.TaskId
 	ctx.Logger.Info("wait for VM to be destroyed")
 	return vm, nil
@@ -209,11 +206,13 @@ func (vms *VMService) reconcileNetworkStatus(ctx *virtualMachineContext) error {
 	if len(netStatus) >= 1 {
 		if ctx.ICSVM.Status.Addresses == nil && netStatus[0].IPAddrs != nil {
 			infrautilv1.UpdateNetworkInfo(&ctx.VMContext, netStatus)
-			err = ctx.Patch()
-			if err != nil {
-				ctx.Logger.Error(err, "ICSVM Path IPAddress Error")
+			if infrautilv1.IsControlPlaneMachine(ctx.ICSVM) {
+				err = ctx.Patch()
+				if err != nil {
+					ctx.Logger.Error(err, "ICSVM Path IPAddress Error")
+				}
+				ctx.Logger.Info("ICSVM Path IPAddress", "netStatus", netStatus)
 			}
-			ctx.Logger.Info("ICSVM Path IPAddress", "netStatus", netStatus)
 		}
 	}
 	ctx.Logger.Info("reconciling reconcileNetworkStatus ended", "netStatus", netStatus)
@@ -236,6 +235,7 @@ func (vms *VMService) reconcileMetadata(ctx *virtualMachineContext, newMetadata 
 	if err != nil {
 		return false, errors.Wrapf(err, "unable to set metadata on vm %s", ctx)
 	}
+	time.Sleep(time.Duration(12) * time.Second)
 
 	ctx.ICSVM.Status.TaskRef = taskRef
 	ctx.Logger.Info("VM metadata to be updated")
@@ -250,9 +250,6 @@ func (vms *VMService) reconcilePowerState(ctx *virtualMachineContext) (bool, err
 	switch powerState {
 	case infrav1.VirtualMachinePowerStatePoweredOff:
 		ctx.Logger.Info("powering on")
-		if infrautilv1.IsControlPlaneMachine(ctx.ICSVM) {
-			time.Sleep(time.Duration(2) * time.Minute)
-		}
 		task, err := ctx.Obj.PowerOnVM(ctx, ctx.Ref.Value)
 		if err != nil {
 			return false, errors.Wrapf(err, "failed to trigger power on op for vm %s", ctx)
@@ -275,6 +272,51 @@ func (vms *VMService) reconcilePowerState(ctx *virtualMachineContext) (bool, err
 	}
 }
 
+func (vms *VMService) reconcileCloudInit(ctx *virtualMachineContext) (bool, error) {
+	vmObj, err := ctx.Obj.GetVM(ctx, ctx.Ref.Value)
+	if err != nil {
+		return false, errors.Errorf("get vm %s info err", ctx.Ref.Value)
+	}
+
+	if vmObj != nil && len(vmObj.ExtendData) > 0 {
+		return true, nil
+	}
+
+	ctx.Logger.Info("restarting vm on")
+
+	if vmObj.Status == "STOPPED" {
+		ctx.Logger.Info("first powering on")
+		powerOnTask, err := ctx.Obj.PowerOnVM(ctx, ctx.Ref.Value)
+		if err != nil {
+			return false, errors.Wrapf(err, "failed to trigger power on op for vm %s", ctx)
+		}
+
+		// Wait for the VM to be powered off.
+		taskService := taskapi.NewTaskService(ctx.Session.Client)
+		powerOnTaskInfo, err := taskService.WaitForResult(ctx, powerOnTask)
+		if err != nil && powerOnTaskInfo == nil {
+			ctx.Logger.Error(err, "ics task tracing error.", "id", powerOnTask.TaskId)
+		}
+		time.Sleep(time.Duration(24) * time.Second)
+
+		powerOffTask, err := ctx.Obj.PowerOffVM(ctx, ctx.Ref.Value)
+		if err != nil {
+			return false, errors.Wrapf(err, "failed to trigger power off op for vm %s", ctx)
+		}
+
+		// Wait for the VM to be powered off.
+		taskService = taskapi.NewTaskService(ctx.Session.Client)
+		powerOffTaskInfo, err := taskService.WaitForResult(ctx, powerOffTask)
+		if err != nil && powerOffTaskInfo == nil {
+			ctx.Logger.Error(err, "ics task tracing error.", "id", powerOffTask.TaskId)
+		}
+		time.Sleep(time.Duration(12) * time.Second)
+	}
+
+	ctx.Logger.Info("Reconcile CloudInit Will Starting ...")
+	return true, nil
+}
+
 func (vms *VMService) reconcileUUID(ctx *virtualMachineContext) {
 	vm, err := ctx.Obj.GetVM(ctx, ctx.Ref.Value)
 	if err != nil {
@@ -285,13 +327,11 @@ func (vms *VMService) reconcileUUID(ctx *virtualMachineContext) {
 }
 
 func (vms *VMService) getPowerState(ctx *virtualMachineContext) (infrav1.VirtualMachinePowerState, error) {
-	ctx.Logger.Info("#####wyc####ctx.Obj.GetVM starting...", "Ref", ctx.Ref.Value)
 	vmObj, err := ctx.Obj.GetVM(ctx, ctx.Ref.Value)
 	if err != nil {
-		ctx.Logger.Info("#####wyc####ctx.Obj.GetVM", "err", err)
+		ctx.Logger.Error(err,"fail to get vm info from ics")
 		return "", err
 	}
-	ctx.Logger.Info("#####wyc####ctx.Obj.GetVM", "Status", vmObj.Status)
 
 	switch vmObj.Status {
 	case "STARTED":
@@ -337,6 +377,7 @@ func (vms *VMService) setMetadata(ctx *virtualMachineContext, metadata []byte) (
 	}
 
 	vmObj.ExtendData = metadataBase64
+	vmObj.CloudInited = true
 
 	task, err := ctx.Obj.SetVM(ctx, *vmObj)
 	if err != nil {
@@ -398,11 +439,10 @@ func (vms *VMService) reconcileDeleteIPAddress(ctx *context.VMContext) error {
 		ctrlclient.InNamespace(ctx.ICSVM.GetNamespace()),
 		ctrlclient.MatchingFields{"spec.vmRef.name": ctx.ICSVM.GetName()},
 	)
-	if err != nil && err.Error() != "" {
-		ctx.Logger.Info("#####wyc####reconcileDeleteIPAddress", "err", err)
+	if err != nil {
+		ctx.Logger.Error(err,"fail to get k8s ipAddress resources.")
 		return err
 	}
-	ctx.Logger.Info("#####wyc####reconcileDeleteIPAddress", "ipAddresses", ipAddresses)
 	if ipAddresses.Items != nil {
 		for _, ipAddress := range ipAddresses.Items {
 			// If the IPAddress was found and it's not already enqueued for
@@ -410,7 +450,6 @@ func (vms *VMService) reconcileDeleteIPAddress(ctx *context.VMContext) error {
 			if err := ctx.Client.Delete(ctx, ipAddress.DeepCopy()); err != nil {
 				return err
 			}
-			ctx.Logger.Info("#####wyc####IPAddress Delete", "ipAddress", ipAddress)
 		}
 
 		// Go ahead and return here since the deletion of the ICSVM resource
