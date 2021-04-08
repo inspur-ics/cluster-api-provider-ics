@@ -33,7 +33,7 @@ type CPIConfig struct {
 
 	// ICenter is a list of iCenter configurations.
 	// +optional
-	ICenter map[string]CPIICenterConfig `gcfg:"VirtualCenter,omitempty" json:"virtualCenter,omitempty"`
+	ICenter map[string]CPIICenterConfig `gcfg:"ICSCenter,omitempty" json:"virtualCenter,omitempty"`
 
 	// Network is the ics cloud provider's network configuration.
 	// +optional
@@ -86,7 +86,7 @@ type CPIStorageConfig struct {
 // kubebuilder v2 won't generate CRDs for map types with *Values.
 type unmarshallableConfig struct {
 	Global    CPIGlobalConfig              `gcfg:"Global,omitempty"`
-	ICenter   map[string]*CPIICenterConfig `gcfg:"VirtualCenter,omitempty"`
+	ICenter   map[string]*CPIICenterConfig `gcfg:"ICSCenter,omitempty"`
 	Network   CPINetworkConfig             `gcfg:"Network,omitempty"`
 	Disk      CPIDiskConfig                `gcfg:"Disk,omitempty"`
 	Workspace CPIWorkspaceConfig           `gcfg:"Workspace,omitempty"`
