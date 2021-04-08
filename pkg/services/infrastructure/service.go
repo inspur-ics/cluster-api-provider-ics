@@ -89,10 +89,10 @@ func (vms *VMService) ReconcileVM(ctx *context.VMContext) (vm infrav1.VirtualMac
 		return vm, err
 	}
 
-	// ICS VM exec cloud init configuration data
-	if ok, err := vms.reconcileCloudInit(vmCtx); err != nil || !ok {
-		return vm, err
-	}
+	//// ICS VM exec cloud init configuration data
+	//if ok, err := vms.reconcileCloudInit(vmCtx); err != nil || !ok {
+	//	return vm, err
+	//}
 
 	// Get the bootstrap data.
 	bootstrapData, err := vms.getBootstrapData(ctx)
@@ -261,6 +261,9 @@ func (vms *VMService) reconcilePowerState(ctx *virtualMachineContext) (bool, err
 		// Once the VM is successfully powered on, a reconcile request should be
 		// triggered once the VM reports IP addresses are available.
 		reconcileICSVMWhenNetworkIsReady(ctx, task)
+
+		taskService := taskapi.NewTaskService(ctx.Session.Client)
+		_, _ = taskService.WaitForResult(ctx, task)
 
 		ctx.Logger.Info("wait for VM to be powered on")
 		return false, nil
