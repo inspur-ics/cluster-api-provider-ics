@@ -61,7 +61,7 @@ spec:
       name: '${ ICS_NETWORK }'
     providerConfig:
       cloud:
-        controllerImage: gcr.io/cloud-provider-ics/cpi/release/manager:v1.0.0
+        controllerImage: icsccm:v1.5
       storage:
         attacherImage: quay.io/k8scsi/csi-attacher:v1.1.1
         controllerImage: ics-csi-driver:latest
