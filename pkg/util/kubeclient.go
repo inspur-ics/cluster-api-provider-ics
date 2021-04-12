@@ -21,7 +21,11 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/discovery/cached/memory"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha3"
 	kcfg "sigs.k8s.io/cluster-api/util/kubeconfig"
@@ -35,13 +39,13 @@ func NewKubeClient(
 	controllerClient client.Client,
 	cluster *clusterv1.Cluster) (kubernetes.Interface, error) {
 	clusterKey := client.ObjectKey{Namespace: cluster.Namespace, Name: cluster.Name}
-	kubeconfig, err := kcfg.FromSecret(ctx, controllerClient, clusterKey)
+	config, err := kcfg.FromSecret(ctx, controllerClient, clusterKey)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to retrieve kubeconfig secret for Cluster %q in namespace %q",
 			cluster.Name, cluster.Namespace)
 	}
 
-	restConfig, err := clientcmd.RESTConfigFromKubeConfig(kubeconfig)
+	restConfig, err := clientcmd.RESTConfigFromKubeConfig(config)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create client configuration for Cluster %q in namespace %q",
 			cluster.Name, cluster.Namespace)
@@ -50,4 +54,67 @@ func NewKubeClient(
 	restConfig.Timeout = 10 * time.Second
 
 	return kubernetes.NewForConfig(restConfig)
+}
+
+// NewDynamicClient returns a new dynamic client for the target cluster using the KubeConfig
+// secret stored in the management cluster.
+func NewDynamicClient(
+	ctx context.Context,
+	controllerClient client.Client,
+	cluster *clusterv1.Cluster) (dynamic.Interface, error) {
+	clusterKey := client.ObjectKey{Namespace: cluster.Namespace, Name: cluster.Name}
+	config, err := kcfg.FromSecret(ctx, controllerClient, clusterKey)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to retrieve kubeconfig secret for Cluster %q in namespace %q",
+			cluster.Name, cluster.Namespace)
+	}
+
+	restConfig, err := clientcmd.RESTConfigFromKubeConfig(config)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create client configuration for Cluster %q in namespace %q",
+			cluster.Name, cluster.Namespace)
+	}
+	// sets the timeout, otherwise this will default to 0 (i.e. no timeout) which might cause tests to hang
+	restConfig.Timeout = 10 * time.Second
+
+	return dynamic.NewForConfig(restConfig)
+}
+
+// NewDynamicClient returns a new dynamic client for the target cluster using the KubeConfig
+// secret stored in the management cluster.
+func NewDiscoveryClient(
+	ctx context.Context,
+	controllerClient client.Client,
+	cluster *clusterv1.Cluster) (*discovery.DiscoveryClient, error) {
+	clusterKey := client.ObjectKey{Namespace: cluster.Namespace, Name: cluster.Name}
+	config, err := kcfg.FromSecret(ctx, controllerClient, clusterKey)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to retrieve kubeconfig secret for Cluster %q in namespace %q",
+			cluster.Name, cluster.Namespace)
+	}
+
+	restConfig, err := clientcmd.RESTConfigFromKubeConfig(config)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create client configuration for Cluster %q in namespace %q",
+			cluster.Name, cluster.Namespace)
+	}
+	// sets the timeout, otherwise this will default to 0 (i.e. no timeout) which might cause tests to hang
+	restConfig.Timeout = 10 * time.Second
+
+	return discovery.NewDiscoveryClientForConfig(restConfig)
+}
+
+func GetDiscoveryRESTMapper(
+	ctx context.Context,
+	controllerClient client.Client,
+	cluster *clusterv1.Cluster) (*restmapper.DeferredDiscoveryRESTMapper, error) {
+
+	discoveryClient, err := NewDiscoveryClient(ctx, controllerClient, cluster)
+	if err != nil {
+		return nil, errors.Wrap(err, "new discovery client error.")
+	}
+
+	mapper := restmapper.NewDeferredDiscoveryRESTMapper(memory.NewMemCacheClient(discoveryClient))
+	return mapper, nil
+
 }

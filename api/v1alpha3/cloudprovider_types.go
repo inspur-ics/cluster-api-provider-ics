@@ -206,6 +206,10 @@ type CPINetworkConfig struct {
 	// Name is the name of the network to which VMs are connected.
 	// +optional
 	Name string `gcfg:"public-network,omitempty" json:"name,omitempty"`
+
+	// CNIType is the type of the cni network for the IKC cluster.
+	// +optional
+	CNIType string `gcfg:"public-cnitype,omitempty" json:"cniType,omitempty"`
 }
 
 // CPIDiskConfig defines the disk configuration for the ics cloud provider.
