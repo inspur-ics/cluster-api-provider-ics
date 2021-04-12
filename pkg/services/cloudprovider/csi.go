@@ -273,9 +273,10 @@ func NodeDriverRegistrarContainer(image string) corev1.Container {
 
 func ICSCSINodeContainer(image string) corev1.Container {
 	return corev1.Container{
-		Name:  "ics-csi-node",
-		Image: image,
-		Args:  []string{"--v=5"},
+		Name:            "ics-csi-node",
+		Image:           image,
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Args:            []string{"--v=5"},
 		Env: []corev1.EnvVar{
 			{
 				Name:  "CSI_ENDPOINT",
@@ -463,9 +464,10 @@ func CSIAttacherContainer(image string) corev1.Container {
 
 func ICSCSIControllerContainer(image string) corev1.Container {
 	return corev1.Container{
-		Name:  CSIControllerName,
-		Image: image,
-		Args:  []string{"--v=5"},
+		Name:            CSIControllerName,
+		Image:           image,
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Args:            []string{"--v=5"},
 		Lifecycle: &corev1.Lifecycle{
 			PreStop: &corev1.Handler{
 				Exec: &corev1.ExecAction{
