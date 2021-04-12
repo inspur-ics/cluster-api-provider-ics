@@ -450,6 +450,10 @@ spec:
                   network:
                     description: Network is the ics cloud provider's network configuration.
                     properties:
+                      cniType:
+                        description: CNIType is the type of the cni network for the
+                          IKC cluster.
+                        type: string
                       name:
                         description: Name is the name of the network to which VMs
                           are connected.
@@ -1309,7 +1313,7 @@ spec:
           spec:
             description: ICSVMSpec defines the desired state of ICSVM.
             properties:
-              UUID:
+              UID:
                 description: UID is the the VM's ID that is assigned at runtime after
                   the VM has been created. This field is required at runtime for other
                   controllers that read this CRD as unstructured data.

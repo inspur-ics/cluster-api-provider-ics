@@ -17,8 +17,6 @@ limitations under the License.
 package flavors
 
 import (
-	infrav1 "github.com/inspur-ics/cluster-api-provider-ics/api/v1alpha3"
-	cloudprovidersvc "github.com/inspur-ics/cluster-api-provider-ics/pkg/services/cloudprovider"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
@@ -26,6 +24,9 @@ import (
 	bootstrapv1 "sigs.k8s.io/cluster-api/bootstrap/kubeadm/api/v1alpha3"
 	kubeadmv1beta1 "sigs.k8s.io/cluster-api/bootstrap/kubeadm/types/v1beta1"
 	controlplanev1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1alpha3"
+
+	infrav1 "github.com/inspur-ics/cluster-api-provider-ics/api/v1alpha3"
+	cloudprovidersvc "github.com/inspur-ics/cluster-api-provider-ics/pkg/services/cloudprovider"
 )
 
 const (
