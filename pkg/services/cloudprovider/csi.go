@@ -476,7 +476,7 @@ func ICSCSIControllerContainer(image string) corev1.Container {
 		Ports: []corev1.ContainerPort{
 			{
 				Name:          "healthz",
-				ContainerPort: 9808,
+				ContainerPort: 9809,
 				Protocol:      corev1.ProtocolTCP,
 			},
 		},
