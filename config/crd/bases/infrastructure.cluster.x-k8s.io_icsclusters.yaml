@@ -130,6 +130,10 @@ spec:
                   network:
                     description: Network is the ics cloud provider's network configuration.
                     properties:
+                      cniType:
+                        description: CNIType is the type of the cni network for the
+                          IKC cluster.
+                        type: string
                       name:
                         description: Name is the name of the network to which VMs
                           are connected.

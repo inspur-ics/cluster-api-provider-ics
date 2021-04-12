@@ -235,7 +235,7 @@ func (vms *VMService) reconcileMetadata(ctx *virtualMachineContext, newMetadata 
 	if err != nil {
 		return false, errors.Wrapf(err, "unable to set metadata on vm %s", ctx)
 	}
-	time.Sleep(time.Duration(12) * time.Second)
+	time.Sleep(time.Duration(3) * time.Second)
 
 	ctx.ICSVM.Status.TaskRef = taskRef
 	ctx.Logger.Info("VM metadata to be updated")

@@ -26,10 +26,13 @@ import (
 	"github.com/pkg/errors"
 	apiv1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha3"
 	clusterutilv1 "sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/patch"
@@ -291,6 +294,13 @@ func (r clusterReconciler) reconcileNormal(ctx *context.ClusterContext) (reconci
 	if err := r.reconcileStorageProvider(ctx); err != nil {
 		return reconcile.Result{}, errors.Wrapf(err,
 			"failed to reconcile CSI Driver for ICSCluster %s/%s",
+			ctx.ICSCluster.Namespace, ctx.ICSCluster.Name)
+	}
+
+	// Create the external CNI provider addons
+	if err := r.reconcileCNIProvider(ctx); err != nil {
+		return reconcile.Result{}, errors.Wrapf(err,
+			"failed to reconcile cni provider for ICSCluster %s/%s",
 			ctx.ICSCluster.Namespace, ctx.ICSCluster.Name)
 	}
 
@@ -919,4 +929,149 @@ func (r clusterReconciler) loadBalancerToCluster(o handler.MapObject) []ctrl.Req
 			Name:      icsClusterRef.Name,
 		},
 	}}
+}
+
+// nolint:gocognit
+func (r clusterReconciler) reconcileCNIProvider(ctx *context.ClusterContext) error {
+	ctx.Logger.Info("######wyc#######reconcileCNIProvider starting...")
+	// cluster api point to cni plugin type, default is "calico", support "antrea" and "calico"
+	cniType := ctx.ICSCluster.Spec.CloudProviderConfiguration.Network.CNIType
+	if cniType == "" {
+		cniType = "calico"
+	}
+
+	targetClusterClient, err := infrautilv1.NewDynamicClient(ctx, ctx.Client, ctx.Cluster)
+	if err != nil {
+		return errors.Wrapf(err,
+			"failed to get client for Cluster %s/%s",
+			ctx.Cluster.Namespace, ctx.Cluster.Name)
+	}
+	ctx.Logger.Info("######wyc#######got a targetClusterClient")
+
+	switch cniType {
+	case cloudprovider.ANTREA:
+		// init the antrea cni network plugin for the target cluster.
+		if err := r.reconcileAntreaCNIPlugin(ctx, targetClusterClient); err != nil {
+			return err
+		}
+	case cloudprovider.CALICO:
+		// init the calico cni network plugin for the target cluster.
+		if err := r.reconcileCalicoCNIPlugin(ctx, targetClusterClient); err != nil {
+			return err
+		}
+	default:
+		// init the calico cni network plugin for the target cluster.
+		if err := r.reconcileCalicoCNIPlugin(ctx, targetClusterClient); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// nolint:gocognit
+func (r clusterReconciler) reconcileAntreaCNIPlugin(ctx *context.ClusterContext, ikcClient dynamic.Interface) error {
+	ctx.Logger.Info("######wyc#######reconcileAntreaCNIPlugin starting...")
+
+	// antrea custom resource apply.
+	for _, crd := range cloudprovider.AntreaCustomResources {
+		err := r.reconcileDynamicResource(ctx, ikcClient, crd)
+		if err != nil {
+			ctx.Logger.Error(err, "reconcile antrea custom dynamic resource error.")
+		}
+	}
+
+	// antrea default config value apply.
+	for _, config := range cloudprovider.AntreaDefaultApplyConfigs {
+		err := r.reconcileDynamicResource(ctx, ikcClient, config)
+		if err != nil {
+			ctx.Logger.Error(err, "reconcile antrea config dynamic resource error.")
+		}
+	}
+	ctx.Logger.Info("######wyc#######reconcileAntreaCNIPlugin ended")
+	return nil
+}
+
+// nolint:gocognit
+func (r clusterReconciler) reconcileCalicoCNIPlugin(ctx *context.ClusterContext, ikcClient dynamic.Interface) error {
+	ctx.Logger.Info("######wyc#######reconcileCalicoCNIPlugin starting...")
+	// calico custom resource apply.
+	for _, crd := range cloudprovider.CalicoCustomResources {
+		err := r.reconcileDynamicResource(ctx, ikcClient, crd)
+		if err != nil {
+			ctx.Logger.Error(err, "reconcile calico custom dynamic resource error.")
+		}
+	}
+
+	// calico default config value apply.
+	for _, config := range cloudprovider.CalicoDefaultApplyConfigs {
+		err := r.reconcileDynamicResource(ctx, ikcClient, config)
+		if err != nil {
+			ctx.Logger.Error(err, "reconcile calico config dynamic resource error.")
+		}
+	}
+	ctx.Logger.Info("######wyc#######reconcileCalicoCNIPlugin ended")
+	return nil
+}
+
+// reconcileDynamicResource function to handle the untrusted object.
+func (r clusterReconciler) reconcileDynamicResource(
+	ctx *context.ClusterContext,
+	ikcClient dynamic.Interface,
+	yamlData string) error {
+
+	// the obj is unstructured k8s object.
+	obj := &unstructured.Unstructured{}
+
+	// decode YAML into unstructured.Unstructured
+	dec := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
+	decObj, gvk, err := dec.Decode([]byte(yamlData), nil, obj)
+	if err != nil {
+		ctx.Logger.Error(err, "decoding serializer objects error.")
+		return err
+	}
+	if decObj == nil {
+		ctx.Logger.Error(errors.New("decoded serializer error."), "decoded object is nil.")
+		return err
+	}
+
+	mapper, err := infrautilv1.GetDiscoveryRESTMapper(ctx, ctx.Client, ctx.Cluster)
+	if err != nil {
+		return errors.Wrapf(err,
+			"failed to get discovery client for Cluster %s/%s",
+			ctx.Cluster.Namespace, ctx.Cluster.Name)
+	}
+
+	mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	if err != nil {
+		return err
+	}
+
+	var dynamicResource dynamic.ResourceInterface
+	if mapping.Scope.Name() == meta.RESTScopeNameNamespace {
+		// namespaced resources should specify the namespace
+		dynamicResource = ikcClient.Resource(mapping.Resource).Namespace(obj.GetNamespace())
+	} else {
+		// for cluster-wide resources
+		dynamicResource = ikcClient.Resource(mapping.Resource)
+	}
+
+	dbObj, _ := dynamicResource.Get(obj.GetName(), metav1.GetOptions{})
+	if dbObj != nil  {
+		ctx.Logger.Info("custom resource has been created", "name", obj.GetName())
+		return nil
+	}
+
+	//data, err := json.Marshal(obj)
+	//if err != nil {
+	//	return err
+	//}
+	//ctx.Logger.Info("ReconcileDynamicResource Json:", "untrusted-object", data)
+
+	_, err = dynamicResource.Create(obj, metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
