@@ -130,9 +130,10 @@ func CloudControllerManagerDaemonSet(image string, args []string) *appsv1.Daemon
 					ServiceAccountName: "cloud-controller-manager",
 					Containers: []corev1.Container{
 						{
-							Name:  "ics-cloud-controller-manager",
-							Image: image,
-							Args:  args,
+							Name:            "ics-cloud-controller-manager",
+							Image:           image,
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							Args:            args,
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "ics-config-volume",
