@@ -260,7 +260,7 @@ func isEmpty(val reflect.Value) bool {
 // into a pod spec
 func (cpic *CPICloudConfig) MarshalCloudProviderArgs() []string {
 	args := []string{
-		"--v=2",
+		"--v=5",
 		"--cloud-provider=ics",
 		"--cloud-config=/etc/cloud/ics.conf",
 	}

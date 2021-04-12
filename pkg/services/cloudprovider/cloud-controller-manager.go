@@ -28,7 +28,7 @@ import (
 // NOTE: the contents of this file are derived from https://github.com/kubernetes/cloud-provider-ics/tree/master/manifests/controller-manager
 
 const (
-	DefaultCPIControllerImage = "gcr.io/cloud-provider-ics/cpi/release/manager:v1.0.0"
+	DefaultCPIControllerImage = "icsccm:v1.5"
 )
 
 // CloudControllerManagerServiceAccount returns the ServiceAccount used for the cloud-controller-manager

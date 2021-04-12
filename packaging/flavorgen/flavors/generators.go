@@ -17,11 +17,11 @@ limitations under the License.
 package flavors
 
 import (
+	infrav1 "github.com/inspur-ics/cluster-api-provider-ics/api/v1alpha3"
+	cloudprovidersvc "github.com/inspur-ics/cluster-api-provider-ics/pkg/services/cloudprovider"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
-	infrav1 "github.com/inspur-ics/cluster-api-provider-ics/api/v1alpha3"
-	cloudprovidersvc "github.com/inspur-ics/cluster-api-provider-ics/pkg/services/cloudprovider"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha3"
 	bootstrapv1 "sigs.k8s.io/cluster-api/bootstrap/kubeadm/api/v1alpha3"
 	kubeadmv1beta1 "sigs.k8s.io/cluster-api/bootstrap/kubeadm/types/v1beta1"
@@ -31,7 +31,7 @@ import (
 const (
 	clusterNameVar              = "${ CLUSTER_NAME }"
 	controlPlaneMachineCountVar = "${ CONTROL_PLANE_MACHINE_COUNT }"
-	defaultCloudProviderImage   = "gcr.io/cloud-provider-ics/cpi/release/manager:v1.0.0"
+	defaultCloudProviderImage   = "icsccm:v1.5"
 	defaultClusterCIDR          = "192.168.0.0/16"
 	defaultDiskGiB              = 25
 	defaultMemoryMiB            = 8192
@@ -41,7 +41,7 @@ const (
 	namespaceVar                = "${ NAMESPACE }"
 	icsDataCenterVar            = "${ ICS_DATACENTER }"
 	icsDatastoreVar             = "${ ICS_DATASTORE }"
-	icsClusterVar                = "${ ICS_CLUSTER }"
+	icsClusterVar               = "${ ICS_CLUSTER }"
 	icsHaproxyTemplateVar       = "${ ICS_HAPROXY_TEMPLATE }"
 	icsNetworkVar               = "${ ICS_NETWORK }"
 	icsResourcePoolVar          = "${ ICS_RESOURCE_POOL }"
@@ -131,7 +131,7 @@ func newICSCluster(lb *infrav1.HAProxyLoadBalancer) infrav1.ICSCluster {
 					Datacenter:   icsDataCenterVar,
 					Datastore:    icsDatastoreVar,
 					ResourcePool: icsResourcePoolVar,
-					Cluster:       icsClusterVar,
+					Cluster:      icsClusterVar,
 				},
 				ProviderConfig: infrav1.CPIProviderConfig{
 					Cloud: &infrav1.CPICloudConfig{
@@ -241,7 +241,7 @@ func defaultVirtualMachineCloneSpec() infrav1.VirtualMachineCloneSpec {
 		Server:       icsServerVar,
 		ResourcePool: icsResourcePoolVar,
 		Datastore:    icsDatastoreVar,
-		Cluster:       icsClusterVar,
+		Cluster:      icsClusterVar,
 	}
 }
 
