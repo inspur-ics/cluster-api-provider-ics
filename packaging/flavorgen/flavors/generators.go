@@ -40,8 +40,6 @@ const (
 	kubernetesVersionVar        = "${ KUBERNETES_VERSION }"
 	machineDeploymentNameSuffix = "-md-0"
 	namespaceVar                = "${ NAMESPACE }"
-	icsUsername                 = "${ ICS_USERNAME }"
-	icsPassword                 = "${ ICS_PASSWORD }"
 	icsDataCenterVar            = "${ ICS_DATACENTER }"
 	icsDatastoreVar             = "${ ICS_DATASTORE }"
 	icsClusterVar               = "${ ICS_CLUSTER }"
@@ -122,8 +120,6 @@ func newICSCluster(lb *infrav1.HAProxyLoadBalancer) infrav1.ICSCluster {
 					SecretName:      "cloud-provider-ics-credentials",
 					SecretNamespace: metav1.NamespaceSystem,
 					Insecure:        true,
-					Username:        icsUsername,
-					Password:        icsPassword,
 				},
 				ICenter: map[string]infrav1.CPIICenterConfig{
 					icsServerVar: {Datacenters: icsDataCenterVar},

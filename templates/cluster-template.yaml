@@ -57,8 +57,6 @@ spec:
       insecure: true
       secretName: cloud-provider-ics-credentials
       secretNamespace: kube-system
-      username: '${ICS_USERNAME}'
-      password: '${ICS_PASSWORD}'
     network:
       name: '${ ICS_NETWORK }'
     providerConfig:
