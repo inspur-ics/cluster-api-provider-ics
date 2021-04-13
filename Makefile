@@ -69,7 +69,7 @@ ARCH ?= amd64
 ALL_ARCH = amd64 arm arm64 ppc64le s390x
 # Common docker variables
 IMAGE_NAME ?= manager
-PULL_POLICY ?= Always
+PULL_POLICY ?= IfNotPresent
 # Hosts running SELinux need :z added to volume mounts
 SELINUX_ENABLED := $(shell cat /sys/fs/selinux/enforce 2> /dev/null || echo 0)
 
