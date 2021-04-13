@@ -242,7 +242,7 @@ func NodeDriverRegistrarContainer(image string) corev1.Container {
 			},
 		},
 		Args: []string{
-			"--v=5",
+			"--v=10",
 			"--csi-address=$(ADDRESS)",
 			"--kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)",
 		},
@@ -277,7 +277,7 @@ func ICSCSINodeContainer(image string) corev1.Container {
 		Name:            "ics-csi-node",
 		Image:           image,
 		ImagePullPolicy: corev1.PullIfNotPresent,
-		Args:            []string{"--v=5"},
+		Args:            []string{"--v=10"},
 		Env: []corev1.EnvVar{
 			{
 				Name:  "CSI_ENDPOINT",
@@ -447,7 +447,7 @@ func CSIAttacherContainer(image string) corev1.Container {
 	return corev1.Container{
 		Name:  "csi-attacher",
 		Image: image,
-		Args:  []string{"--v=5", "--timeout=300s", "--csi-address=$(ADDRESS)", "--leader-election"},
+		Args:  []string{"--v=10", "--timeout=300s", "--csi-address=$(ADDRESS)", "--leader-election"},
 		Env: []corev1.EnvVar{
 			{
 				Name:  "ADDRESS",
@@ -468,7 +468,7 @@ func ICSCSIControllerContainer(image string) corev1.Container {
 		Name:            CSIControllerName,
 		Image:           image,
 		ImagePullPolicy: corev1.PullIfNotPresent,
-		Args:            []string{"--v=5"},
+		Args:            []string{"--v=10"},
 		Lifecycle: &corev1.Lifecycle{
 			PreStop: &corev1.Handler{
 				Exec: &corev1.ExecAction{
@@ -556,7 +556,7 @@ func ICSSyncerContainer(image string) corev1.Container {
 		Name:  "ics-csi-syncer",
 		Image: image,
 		//Args:  []string{"--leader-election"},
-		Args: []string{"--v=5"},
+		Args: []string{"--v=10"},
 		Env: []corev1.EnvVar{
 			{
 				Name:  "FULL_SYNC_INTERVAL_MINUTES",

@@ -761,7 +761,7 @@ func (r clusterReconciler) reconcileStorageProvider(ctx *context.ClusterContext)
 		return err
 	}
 
-	cloudConfigSecret := cloudprovider.CSICloudConfigSecret(strings.ReplaceAll(string(cloudConfig), "ICenter", "ICSCenter"))
+	cloudConfigSecret := cloudprovider.CSICloudConfigSecret(strings.ReplaceAll(string(cloudConfig), "ICenter", "VirtualCenter"))
 	if _, err := targetClusterClient.CoreV1().Secrets(cloudConfigSecret.Namespace).Create(cloudConfigSecret); err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
