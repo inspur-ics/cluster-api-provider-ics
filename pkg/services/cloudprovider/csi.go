@@ -447,7 +447,7 @@ func CSIAttacherContainer(image string) corev1.Container {
 	return corev1.Container{
 		Name:  "csi-attacher",
 		Image: image,
-		Args: []string{"--v=5", "--timeout=300s", "--csi-address=$(ADDRESS)"},
+		Args:  []string{"--v=5", "--timeout=300s", "--csi-address=$(ADDRESS)"},
 		Env: []corev1.EnvVar{
 			{
 				Name:  "ADDRESS",
@@ -479,7 +479,7 @@ func ICSCSIControllerContainer(image string) corev1.Container {
 		Ports: []corev1.ContainerPort{
 			{
 				Name:          "healthz",
-				ContainerPort: 9809,
+				ContainerPort: 9808,
 				Protocol:      corev1.ProtocolTCP,
 			},
 		},
