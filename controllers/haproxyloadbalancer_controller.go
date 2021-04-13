@@ -215,8 +215,6 @@ func (r haproxylbReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result, reterr 
 }
 
 func (r haproxylbReconciler) reconcileDelete(ctx *context.HAProxyLoadBalancerContext) (ctrl.Result, error) {
-	ctx.Logger.Info("Handling deleted HAProxyLoadBalancer")
-
 	if err := r.reconcileDeleteVM(ctx); err != nil {
 		if apierrors.IsNotFound(err) {
 			if err := r.reconcileDeleteSecrets(ctx); err != nil {
@@ -307,14 +305,12 @@ func (r haproxylbReconciler) reconcileNormal(ctx *context.HAProxyLoadBalancerCon
 	}
 
 	if !ctx.HAProxyLoadBalancer.Status.Ready {
-		ctx.Logger.Info("HAProxy LoadBalancer not ready, reconciling network")
 		// Reconcile the HAProxyLoadBalancer's address.
 		if ok, err := r.reconcileNetwork(ctx, vm); !ok {
 			if err != nil {
 				ctx.Logger.Error(err, "Unexpected error while reconciling network")
 				return ctrl.Result{}, err
 			}
-			ctx.Logger.Info("Network is not reconciled, requeing in 10 seconds")
 			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 		}
 
@@ -377,7 +373,6 @@ func (r haproxylbReconciler) BackEndpointsForCluster(ctx *context.HAProxyLoadBal
 			}
 			addresses = icsMachine.Status.Addresses
 		}
-		ctx.Logger.Info("Control Plane Machine IP", "addresses", addresses)
 
 		machineEndpoints := make([]corev1.EndpointAddress, 0)
 		for i, addr := range addresses {
@@ -475,7 +470,6 @@ func (r haproxylbReconciler) reconcileLoadBalancerConfiguration(ctx *context.HAP
 
 	// commit new configuration, ending the transaction
 	if originalConfig != comparisonConfig {
-		ctx.Logger.Info("HAProxy Configuration changed, reloading")
 		_, _, err := client.ConfigurationApi.PostHAProxyConfiguration(ctx, haProxyConfig, &hapi.PostHAProxyConfigurationOpts{
 			Version: optional.NewInt32(transaction.Version),
 		})
@@ -579,10 +573,8 @@ func (r haproxylbReconciler) reconcileVMPre7(ctx *context.HAProxyLoadBalancerCon
 	}
 	if _, err := ctrlutil.CreateOrUpdate(ctx, ctx.Client, vm, mutateFn); err != nil {
 		if apierrors.IsAlreadyExists(err) {
-			ctx.Logger.Info("ICSVM already exists")
 			return nil, err
 		}
-		ctx.Logger.Error(err, "Failed to CreateOrUpdate ICSVM")
 		return nil, err
 	}
 
@@ -609,7 +601,6 @@ func (r haproxylbReconciler) reconcileNetwork(ctx *context.HAProxyLoadBalancerCo
 				vm.GetName(),
 				ctx)
 		}
-		ctx.Logger.Info("waiting on vm for ip address")
 		return false, nil
 	}
 	for _, addr := range addresses {
@@ -628,10 +619,8 @@ func (r haproxylbReconciler) reconcileNetwork(ctx *context.HAProxyLoadBalancerCo
 		return false, nil
 	case ctx.HAProxyLoadBalancer.Status.Address == "":
 		ctx.HAProxyLoadBalancer.Status.Address = newAddr
-		ctx.Logger.Info("Initialized IP address")
 	case newAddr != ctx.HAProxyLoadBalancer.Status.Address:
 		ctx.HAProxyLoadBalancer.Status.Address = newAddr
-		ctx.Logger.Info("Updated IP address")
 	}
 
 	return true, nil

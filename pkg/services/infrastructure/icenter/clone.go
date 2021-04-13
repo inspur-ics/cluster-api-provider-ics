@@ -41,7 +41,6 @@ func Clone(ctx *context.VMContext) error {
 		Logger:            ctx.Logger.WithName("icenter"),
 		PatchHelper:       ctx.PatchHelper,
 	}
-	ctx.Logger.Info("starting clone process")
 
 	vmTemplate := types.VirtualMachine{}
 	tpl, err := template.FindTemplate(ctx, ctx.ICSVM.Spec.Template)
