@@ -447,7 +447,8 @@ func CSIAttacherContainer(image string) corev1.Container {
 	return corev1.Container{
 		Name:  "csi-attacher",
 		Image: image,
-		Args:  []string{"--v=5", "--timeout=300s", "--csi-address=$(ADDRESS)", "--leader-election"},
+		//Args:  []string{"--v=5", "--timeout=300s", "--csi-address=$(ADDRESS)", "--leader-election"},
+		Args: []string{"--v=5", "--timeout=300s", "--csi-address=$(ADDRESS)"},
 		Env: []corev1.EnvVar{
 			{
 				Name:  "ADDRESS",
@@ -553,8 +554,9 @@ func LivenessProbeForCSIControllerContainer(image string) corev1.Container {
 
 func ICSSyncerContainer(image string) corev1.Container {
 	return corev1.Container{
-		Name:  "ics-csi-syncer",
-		Image: image,
+		Name:            "ics-csi-syncer",
+		Image:           image,
+		ImagePullPolicy: corev1.PullIfNotPresent,
 		//Args:  []string{"--leader-election"},
 		Args: []string{"--v=5"},
 		Env: []corev1.EnvVar{
