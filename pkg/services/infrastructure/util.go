@@ -263,7 +263,6 @@ func reconcileICSVMOnFuncCompletion(
 		// Once the task has completed (successfully or otherwise), trigger
 		// a reconcile event for the associated resource by sending a
 		// GenericEvent into the event channel for the resource type.
-		ctx.Logger.Info("triggering GenericEvent", loggerKeysAndValues...)
 		eventChannel := ctx.GetGenericEventChannelFor(gvk)
 		eventChannel <- event.GenericEvent{
 			Meta:   obj,

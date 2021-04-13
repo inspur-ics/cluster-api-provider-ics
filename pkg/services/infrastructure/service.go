@@ -109,7 +109,6 @@ func (vms *VMService) ReconcileVM(ctx *context.VMContext) (vm infrav1.VirtualMac
 		return vm, err
 	}
 
-	ctx.Logger.Info("ReconcileVM end")
 	vm.State = infrav1.VirtualMachineStateReady
 	return vm, nil
 }
@@ -184,7 +183,6 @@ func (vms *VMService) DestroyVM(ctx *context.VMContext) (infrav1.VirtualMachine,
 
 	// At this point the VM is not powered on and can be destroyed. Store the
 	// destroy task's reference and return a requeue error.
-	ctx.Logger.Info("destroying vm", "vmRef", vmRef)
 	task, err := vmCtx.Obj.DeleteVM(ctx, vmRef.Value, true, true)
 	if err != nil {
 		ctx.Logger.Error(err, "fail to destroying vm")
@@ -196,10 +194,8 @@ func (vms *VMService) DestroyVM(ctx *context.VMContext) (infrav1.VirtualMachine,
 }
 
 func (vms *VMService) reconcileNetworkStatus(ctx *virtualMachineContext) error {
-	ctx.Logger.Info("reconciling reconcileNetworkStatus staring...")
 	netStatus, err := vms.getNetworkStatus(ctx)
 	if err != nil {
-		ctx.Logger.Info("reconciling reconcileNetworkStatus ended", "err", err)
 		return err
 	}
 	ctx.State.Network = netStatus
@@ -211,11 +207,9 @@ func (vms *VMService) reconcileNetworkStatus(ctx *virtualMachineContext) error {
 				if err != nil {
 					ctx.Logger.Error(err, "ICSVM Path IPAddress Error")
 				}
-				ctx.Logger.Info("ICSVM Path IPAddress", "netStatus", netStatus)
 			}
 		}
 	}
-	ctx.Logger.Info("reconciling reconcileNetworkStatus ended", "netStatus", netStatus)
 	return nil
 }
 
@@ -230,7 +224,6 @@ func (vms *VMService) reconcileMetadata(ctx *virtualMachineContext, newMetadata 
 		return true, nil
 	}
 
-	ctx.Logger.Info("updating metadata")
 	taskRef, err := vms.setMetadata(ctx, newMetadata)
 	if err != nil {
 		return false, errors.Wrapf(err, "unable to set metadata on vm %s", ctx)

@@ -940,7 +940,6 @@ func (r clusterReconciler) loadBalancerToCluster(o handler.MapObject) []ctrl.Req
 
 // nolint:gocognit
 func (r clusterReconciler) reconcileCNIProvider(ctx *context.ClusterContext) error {
-	ctx.Logger.Info("######wyc#######reconcileCNIProvider starting...")
 	// cluster api point to cni plugin type, default is "calico", support "antrea" and "calico"
 	cniType := ctx.ICSCluster.Spec.CloudProviderConfiguration.Network.CNIType
 	if cniType == "" {
@@ -953,7 +952,6 @@ func (r clusterReconciler) reconcileCNIProvider(ctx *context.ClusterContext) err
 			"failed to get client for Cluster %s/%s",
 			ctx.Cluster.Namespace, ctx.Cluster.Name)
 	}
-	ctx.Logger.Info("######wyc#######got a targetClusterClient")
 
 	switch cniType {
 	case cloudprovider.ANTREA:
@@ -978,8 +976,6 @@ func (r clusterReconciler) reconcileCNIProvider(ctx *context.ClusterContext) err
 
 // nolint:gocognit
 func (r clusterReconciler) reconcileAntreaCNIPlugin(ctx *context.ClusterContext, ikcClient dynamic.Interface) error {
-	ctx.Logger.Info("######wyc#######reconcileAntreaCNIPlugin starting...")
-
 	// antrea custom resource apply.
 	for _, crd := range cloudprovider.AntreaCustomResources {
 		err := r.reconcileDynamicResource(ctx, ikcClient, crd)
@@ -995,13 +991,11 @@ func (r clusterReconciler) reconcileAntreaCNIPlugin(ctx *context.ClusterContext,
 			ctx.Logger.Error(err, "reconcile antrea config dynamic resource error.")
 		}
 	}
-	ctx.Logger.Info("######wyc#######reconcileAntreaCNIPlugin ended")
 	return nil
 }
 
 // nolint:gocognit
 func (r clusterReconciler) reconcileCalicoCNIPlugin(ctx *context.ClusterContext, ikcClient dynamic.Interface) error {
-	ctx.Logger.Info("######wyc#######reconcileCalicoCNIPlugin starting...")
 	// calico custom resource apply.
 	for _, crd := range cloudprovider.CalicoCustomResources {
 		err := r.reconcileDynamicResource(ctx, ikcClient, crd)
@@ -1017,7 +1011,6 @@ func (r clusterReconciler) reconcileCalicoCNIPlugin(ctx *context.ClusterContext,
 			ctx.Logger.Error(err, "reconcile calico config dynamic resource error.")
 		}
 	}
-	ctx.Logger.Info("######wyc#######reconcileCalicoCNIPlugin ended")
 	return nil
 }
 
@@ -1065,15 +1058,8 @@ func (r clusterReconciler) reconcileDynamicResource(
 
 	dbObj, _ := dynamicResource.Get(obj.GetName(), metav1.GetOptions{})
 	if dbObj != nil  {
-		ctx.Logger.Info("custom resource has been created", "name", obj.GetName())
 		return nil
 	}
-
-	//data, err := json.Marshal(obj)
-	//if err != nil {
-	//	return err
-	//}
-	//ctx.Logger.Info("ReconcileDynamicResource Json:", "untrusted-object", data)
 
 	_, err = dynamicResource.Create(obj, metav1.CreateOptions{})
 	if err != nil {
