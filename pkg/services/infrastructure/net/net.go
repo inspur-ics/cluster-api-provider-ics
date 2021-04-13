@@ -61,7 +61,6 @@ func GetNetworkStatus(
 		ctx.Logger.Error(err, "vm GetNetworkStatus err", "id", moRef)
 		return nil, errors.Wrapf(err, "unable to get vm info, for vm %v", moRef)
 	}
-	ctx.Logger.Info("vm GetNetworkStatus info", "vm", vm)
 	if vm.Nics == nil {
 		return nil, errors.New("vm nics hardware device is nil")
 	}

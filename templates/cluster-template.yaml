@@ -57,6 +57,9 @@ spec:
       insecure: true
       secretName: cloud-provider-ics-credentials
       secretNamespace: kube-system
+    iCenter:
+      ${ ICS_SERVER }:
+        datacenters: '${ ICS_DATACENTER }'
     network:
       name: '${ ICS_NETWORK }'
     providerConfig:
@@ -70,9 +73,6 @@ spec:
         nodeDriverImage: ics-csi-driver:latest
         provisionerImage: quay.io/k8scsi/csi-provisioner:v1.2.2
         registrarImage: quay.io/k8scsi/csi-node-driver-registrar:v1.1.0
-    virtualCenter:
-      ${ ICS_SERVER }:
-        datacenters: '${ ICS_DATACENTER }'
     workspace:
       cluster: '${ ICS_CLUSTER }'
       datacenter: '${ ICS_DATACENTER }'

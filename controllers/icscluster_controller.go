@@ -50,7 +50,10 @@ import (
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/record"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/cloudprovider"
+	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/infrastructure/session"
 	infrautilv1 "github.com/inspur-ics/cluster-api-provider-ics/pkg/util"
+	icstypes "github.com/inspur-ics/ics-go-sdk/client/types"
+	dcapi "github.com/inspur-ics/ics-go-sdk/datacenter"
 )
 
 var (
@@ -643,12 +646,14 @@ func (r clusterReconciler) reconcileCloudProvider(ctx *context.ClusterContext) e
 		return err
 	}
 
-	cloudConfigData, err := ctx.ICSCluster.Spec.CloudProviderConfiguration.MarshalINI()
+	dataCenter := r.GetDataCenterInfo(ctx)
+
+	cloudConfigData, err := cloudprovider.ConfigForCPI(ctx, dataCenter).MarshalINI()
 	if err != nil {
 		return err
 	}
 
-	cloudConfigMap := cloudprovider.CloudControllerManagerConfigMap(string(cloudConfigData))
+	cloudConfigMap := cloudprovider.CloudControllerManagerConfigMap(strings.ReplaceAll(string(cloudConfigData), "ICenter", "ICSCenter"))
 	if _, err := targetClusterClient.CoreV1().ConfigMaps(cloudConfigMap.Namespace).Create(cloudConfigMap); err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
@@ -747,14 +752,16 @@ func (r clusterReconciler) reconcileStorageProvider(ctx *context.ClusterContext)
 		return err
 	}
 
+	dataCenter := r.GetDataCenterInfo(ctx)
+
 	// we have to marshal a separate INI file for CSI since it does not
 	// support Secrets for vCenter credentials yet.
-	cloudConfig, err := cloudprovider.ConfigForCSI(ctx).MarshalINI()
+	cloudConfig, err := cloudprovider.ConfigForCSI(ctx, dataCenter).MarshalINI()
 	if err != nil {
 		return err
 	}
 
-	cloudConfigSecret := cloudprovider.CSICloudConfigSecret(string(cloudConfig))
+	cloudConfigSecret := cloudprovider.CSICloudConfigSecret(strings.ReplaceAll(string(cloudConfig), "ICenter", "ICSCenter"))
 	if _, err := targetClusterClient.CoreV1().Secrets(cloudConfigSecret.Namespace).Create(cloudConfigSecret); err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
@@ -1073,5 +1080,29 @@ func (r clusterReconciler) reconcileDynamicResource(
 		return err
 	}
 
+	return nil
+}
+
+func (r clusterReconciler) GetDataCenterInfo(ctx *context.ClusterContext) *icstypes.Datacenter {
+	// Get or create an authenticated session to the ics endpoint.
+	authSession, err := session.GetOrCreate(r.Context,
+		ctx.ICSCluster.Spec.CloudProviderConfiguration.Workspace.Server,
+		ctx.ICSCluster.Spec.CloudProviderConfiguration.Workspace.Datacenter,
+		r.ControllerManagerContext.Username, r.ControllerManagerContext.Password)
+	if err != nil {
+		r.Logger.Error(err,"failed to create ics session")
+		return nil
+	}
+
+	dcService := dcapi.NewDatacenterService(authSession.Client)
+	dataCenters, err := dcService.GetAllDatacenters(ctx)
+	if err != nil {
+		return nil
+	}
+	for _, dc := range dataCenters {
+		if ctx.ICSCluster.Spec.CloudProviderConfiguration.Workspace.Datacenter == dc.Name {
+			return dc
+		}
+	}
 	return nil
 }

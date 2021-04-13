@@ -422,6 +422,10 @@ spec:
                           storage interface (CSI) is    container orcehstrator (CO)
                           agnostic, and should support non-K8s COs. Defaults to /etc/cloud/credentials.'
                         type: string
+                      server:
+                        description: Server is the ics endpoint IP address. Defaults
+                          to localhost.
+                        type: string
                       serviceAccount:
                         description: ServiceAccount is the Kubernetes service account
                           used to launch the cloud controller manager. Defaults to
@@ -435,6 +439,43 @@ spec:
                         description: Username is the username used to access a ics
                           endpoint.
                         type: string
+                    type: object
+                  iCenter:
+                    additionalProperties:
+                      description: CPIICenterConfig is a ics cloud provider's iCenter
+                        configuration.
+                      properties:
+                        datacenters:
+                          description: Datacenters is a CSV string of the datacenters
+                            in which VMs are located.
+                          type: string
+                        password:
+                          description: Password is the password used to access a ics
+                            endpoint.
+                          type: string
+                        port:
+                          description: Port is the port on which the ics endpoint
+                            is listening. Defaults to 443.
+                          type: string
+                        roundTripperCount:
+                          description: RoundTripperCount specifies the SOAP round
+                            tripper count (retries = RoundTripper - 1)
+                          format: int32
+                          type: integer
+                        server:
+                          description: Server is the ics endpoint IP address. Defaults
+                            to localhost.
+                          type: string
+                        thumbprint:
+                          description: Thumbprint is the cryptographic thumbprint
+                            of the ics endpoint's certificate.
+                          type: string
+                        username:
+                          description: Username is the username used to access a ics
+                            endpoint.
+                          type: string
+                      type: object
+                    description: ICenter is a list of iCenter configurations.
                     type: object
                   labels:
                     description: Labels is the ics cloud provider's zone and region
@@ -492,39 +533,6 @@ spec:
                           registrarImage:
                             type: string
                         type: object
-                    type: object
-                  virtualCenter:
-                    additionalProperties:
-                      description: CPIICenterConfig is a ics cloud provider's iCenter
-                        configuration.
-                      properties:
-                        datacenters:
-                          description: Datacenters is a CSV string of the datacenters
-                            in which VMs are located.
-                          type: string
-                        password:
-                          description: Password is the password used to access a ics
-                            endpoint.
-                          type: string
-                        port:
-                          description: Port is the port on which the ics endpoint
-                            is listening. Defaults to 443.
-                          type: string
-                        roundTripperCount:
-                          description: RoundTripperCount specifies the SOAP round
-                            tripper count (retries = RoundTripper - 1)
-                          format: int32
-                          type: integer
-                        thumbprint:
-                          description: Thumbprint is the cryptographic thumbprint
-                            of the ics endpoint's certificate.
-                          type: string
-                        username:
-                          description: Username is the username used to access a ics
-                            endpoint.
-                          type: string
-                      type: object
-                    description: ICenter is a list of iCenter configurations.
                     type: object
                   workspace:
                     description: Workspace is the ics cloud provider's workspace configuration.

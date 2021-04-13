@@ -23,6 +23,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	"github.com/inspur-ics/cluster-api-provider-ics/api/v1alpha3"
+	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
+	icstypes "github.com/inspur-ics/ics-go-sdk/client/types"
 )
 
 // NOTE: the contents of this file are derived from https://github.com/kubernetes/cloud-provider-ics/tree/master/manifests/controller-manager
@@ -268,6 +272,39 @@ func CloudControllerManagerClusterRoleBinding() *rbacv1.ClusterRoleBinding {
 			},
 		},
 	}
+}
+
+// ConfigForCSI returns a cloudprovider.CPIConfig specific to the vSphere CSI driver until
+// it supports using Secrets for vCenter credentials
+func ConfigForCPI(ctx *context.ClusterContext, dc *icstypes.Datacenter) *v1alpha3.CPIConfig {
+	config := &v1alpha3.CPIConfig{}
+
+	config.Global.Insecure = ctx.ICSCluster.Spec.CloudProviderConfiguration.Global.Insecure
+	config.Global.SecretNamespace = ctx.ICSCluster.Spec.CloudProviderConfiguration.Global.SecretNamespace
+	config.Global.SecretName = ctx.ICSCluster.Spec.CloudProviderConfiguration.Global.SecretName
+	config.Global.Server = ctx.ICSCluster.Spec.CloudProviderConfiguration.Workspace.Server
+	config.Global.Port = "443"
+	config.Global.Username = ctx.Username
+	config.Global.Password = ctx.Password
+
+	config.Network.Name = ctx.ICSCluster.Spec.CloudProviderConfiguration.Network.Name
+
+	config.ICenter = map[string]v1alpha3.CPIICenterConfig{}
+	for name, iCenter := range ctx.ICSCluster.Spec.CloudProviderConfiguration.ICenter {
+		dataCenter :=  iCenter.Datacenters
+		if dc != nil {
+			dataCenter = dc.ID
+		}
+		config.ICenter[name] = v1alpha3.CPIICenterConfig{
+			Server:      name,
+			Port:        "443",
+			Username:    ctx.Username,
+			Password:    ctx.Password,
+			Datacenters: dataCenter,
+		}
+	}
+
+	return config
 }
 
 func int64ptr(i int) *int64 {

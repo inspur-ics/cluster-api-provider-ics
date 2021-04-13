@@ -19,15 +19,16 @@ package cloudprovider
 import (
 	"fmt"
 
-	"github.com/inspur-ics/cluster-api-provider-ics/api/v1alpha3"
-
-	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	"github.com/inspur-ics/cluster-api-provider-ics/api/v1alpha3"
+	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
+	icstypes "github.com/inspur-ics/ics-go-sdk/client/types"
 )
 
 // NOTE: the contents of this file are derived from https://github.com/kubernetes-sigs/ics-csi-driver/tree/master/manifests/1.14
@@ -621,7 +622,7 @@ func CSICloudConfigSecret(data string) *corev1.Secret {
 
 // ConfigForCSI returns a cloudprovider.CPIConfig specific to the vSphere CSI driver until
 // it supports using Secrets for vCenter credentials
-func ConfigForCSI(ctx *context.ClusterContext) *v1alpha3.CPIConfig {
+func ConfigForCSI(ctx *context.ClusterContext, dc *icstypes.Datacenter) *v1alpha3.CPIConfig {
 	config := &v1alpha3.CPIConfig{}
 
 	config.Global.ClusterID = fmt.Sprintf("%s/%s", ctx.Cluster.Namespace, ctx.Cluster.Name)
@@ -630,10 +631,14 @@ func ConfigForCSI(ctx *context.ClusterContext) *v1alpha3.CPIConfig {
 
 	config.ICenter = map[string]v1alpha3.CPIICenterConfig{}
 	for name, icenter := range ctx.ICSCluster.Spec.CloudProviderConfiguration.ICenter {
+		dataCenter := icenter.Datacenters
+		if dc != nil {
+			dataCenter = dc.ID
+		}
 		config.ICenter[name] = v1alpha3.CPIICenterConfig{
 			Username:    ctx.Username,
 			Password:    ctx.Password,
-			Datacenters: icenter.Datacenters,
+			Datacenters: dataCenter,
 		}
 	}
 
