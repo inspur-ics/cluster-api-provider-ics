@@ -33,7 +33,7 @@ type CPIConfig struct {
 
 	// ICenter is a list of iCenter configurations.
 	// +optional
-	ICenter map[string]CPIICenterConfig `gcfg:"ICSCenter,omitempty" json:"virtualCenter,omitempty"`
+	ICenter map[string]CPIICenterConfig `gcfg:"ICenter,omitempty" json:"iCenter,omitempty"`
 
 	// Network is the ics cloud provider's network configuration.
 	// +optional
@@ -86,7 +86,7 @@ type CPIStorageConfig struct {
 // kubebuilder v2 won't generate CRDs for map types with *Values.
 type unmarshallableConfig struct {
 	Global    CPIGlobalConfig              `gcfg:"Global,omitempty"`
-	ICenter   map[string]*CPIICenterConfig `gcfg:"ICSCenter,omitempty"`
+	ICenter   map[string]*CPIICenterConfig `gcfg:"ICenter,omitempty"`
 	Network   CPINetworkConfig             `gcfg:"Network,omitempty"`
 	Disk      CPIDiskConfig                `gcfg:"Disk,omitempty"`
 	Workspace CPIWorkspaceConfig           `gcfg:"Workspace,omitempty"`
@@ -120,6 +120,11 @@ type CPIGlobalConfig struct {
 	// SecretNamespace is the namespace for SecretName.
 	// +optional
 	SecretNamespace string `gcfg:"secret-namespace,omitempty" json:"secretNamespace,omitempty"`
+
+	// Server is the ics endpoint IP address.
+	// Defaults to localhost.
+	// +optional
+	Server string `gcfg:"server,omitempty" json:"server,omitempty"`
 
 	// Port is the port on which the ics endpoint is listening.
 	// Defaults to 443.
@@ -180,6 +185,11 @@ type CPIICenterConfig struct {
 	// Password is the password used to access a ics endpoint.
 	// +optional
 	Password string `gcfg:"password,omitempty" json:"password,omitempty"`
+
+	// Server is the ics endpoint IP address.
+	// Defaults to localhost.
+	// +optional
+	Server string `gcfg:"server,omitempty" json:"server,omitempty"`
 
 	// Port is the port on which the ics endpoint is listening.
 	// Defaults to 443.
