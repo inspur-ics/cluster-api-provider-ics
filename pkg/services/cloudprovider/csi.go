@@ -36,11 +36,11 @@ import (
 const (
 	DefaultCSIControllerImage     = "ics-csi-driver:latest"
 	DefaultCSINodeDriverImage     = "ics-csi-driver:latest"
-	DefaultCSIAttacherImage       = "quay.io/k8scsi/csi-attacher:v1.1.1"
-	DefaultCSIProvisionerImage    = "quay.io/k8scsi/csi-provisioner:v1.2.2"
+	DefaultCSIAttacherImage       = "quay.io/k8scsi/csi-attacher:v2.2.1"
+	DefaultCSIProvisionerImage    = "quay.io/k8scsi/csi-provisioner:v2.1.0"
 	DefaultCSIMetadataSyncerImage = "ics-csi-syncer:latest"
-	DefaultCSILivenessProbeImage  = "quay.io/k8scsi/livenessprobe:v1.1.0"
-	DefaultCSIRegistrarImage      = "quay.io/k8scsi/csi-node-driver-registrar:v1.1.0"
+	DefaultCSILivenessProbeImage  = "quay.io/k8scsi/livenessprobe:v2.1.0"
+	DefaultCSIRegistrarImage      = "quay.io/k8scsi/csi-node-driver-registrar:v2.1.0"
 	CSINamespace                  = metav1.NamespaceSystem
 	CSIControllerName             = "ics-csi-controller"
 )
