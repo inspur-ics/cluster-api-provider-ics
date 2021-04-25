@@ -200,6 +200,8 @@ spec:
                         properties:
                           attacherImage:
                             type: string
+                          resizerImage:
+                            type: string
                           controllerImage:
                             type: string
                           livenessProbeImage:

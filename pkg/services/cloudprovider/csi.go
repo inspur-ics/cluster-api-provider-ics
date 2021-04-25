@@ -36,6 +36,7 @@ import (
 const (
 	DefaultCSIControllerImage     = "ics-csi-driver:latest"
 	DefaultCSINodeDriverImage     = "ics-csi-driver:latest"
+	DefaultCSIResizerImage        = "quay.io/k8scsi/csi-resizer:v1.1.0"
 	DefaultCSIAttacherImage       = "quay.io/k8scsi/csi-attacher:v2.2.1"
 	DefaultCSIProvisionerImage    = "quay.io/k8scsi/csi-provisioner:v2.1.0"
 	DefaultCSIMetadataSyncerImage = "ics-csi-syncer:latest"
@@ -67,7 +68,7 @@ func CSIControllerClusterRole() *rbacv1.ClusterRole {
 			},
 			{
 				APIGroups: []string{""},
-				Resources: []string{"nodes", "pods", "secrets"},
+				Resources: []string{"nodes", "pods", "secrets", "configmaps"},
 				Verbs:     []string{"get", "list", "watch"},
 			},
 			{
@@ -81,9 +82,19 @@ func CSIControllerClusterRole() *rbacv1.ClusterRole {
 				Verbs:     []string{"get", "list", "watch", "update", "patch"},
 			},
 			{
+				APIGroups: []string{"storage.k8s.io"},
+				Resources: []string{"volumeattachments/status"},
+				Verbs:     []string{"patch"},
+			},
+			{
 				APIGroups: []string{""},
 				Resources: []string{"persistentvolumeclaims"},
 				Verbs:     []string{"get", "list", "watch", "update"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"persistentvolumeclaims/status"},
+				Verbs:     []string{"update", "patch"},
 			},
 			{
 				APIGroups: []string{"storage.k8s.io"},
@@ -242,7 +253,7 @@ func NodeDriverRegistrarContainer(image string) corev1.Container {
 			},
 		},
 		Args: []string{
-			"--v=10",
+			"--v=5",
 			"--csi-address=$(ADDRESS)",
 			"--kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)",
 		},
@@ -277,7 +288,7 @@ func ICSCSINodeContainer(image string) corev1.Container {
 		Name:            "ics-csi-node",
 		Image:           image,
 		ImagePullPolicy: corev1.PullIfNotPresent,
-		Args:            []string{"--v=10"},
+		Args:            []string{"--v=5"},
 		Env: []corev1.EnvVar{
 			{
 				Name:  "CSI_ENDPOINT",
@@ -412,6 +423,7 @@ func CSIControllerDeployment(storageConfig *v1alpha3.CPIStorageConfig) *appsv1.D
 					},
 					DNSPolicy: corev1.DNSDefault,
 					Containers: []corev1.Container{
+						CSIResizerContainer(storageConfig.ResizerImage),
 						CSIAttacherContainer(storageConfig.AttacherImage),
 						ICSCSIControllerContainer(storageConfig.ControllerImage),
 						LivenessProbeForCSIControllerContainer(storageConfig.LivenessProbeImage),
@@ -463,12 +475,32 @@ func CSIAttacherContainer(image string) corev1.Container {
 	}
 }
 
+func CSIResizerContainer(image string) corev1.Container {
+	return corev1.Container{
+		Name:  "csi-resizer",
+		Image: image,
+		Args:  []string{"--v=5", "--timeout=300s", "--csi-address=$(ADDRESS)"},
+		Env: []corev1.EnvVar{
+			{
+				Name:  "ADDRESS",
+				Value: "/csi/csi.sock",
+			},
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				MountPath: "/csi",
+				Name:      "socket-dir",
+			},
+		},
+	}
+}
+
 func ICSCSIControllerContainer(image string) corev1.Container {
 	return corev1.Container{
 		Name:            CSIControllerName,
 		Image:           image,
 		ImagePullPolicy: corev1.PullIfNotPresent,
-		Args:            []string{"--v=10"},
+		Args:            []string{"--v=5"},
 		Lifecycle: &corev1.Lifecycle{
 			PreStop: &corev1.Handler{
 				Exec: &corev1.ExecAction{
@@ -557,7 +589,7 @@ func ICSSyncerContainer(image string) corev1.Container {
 		Image:           image,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		//Args:  []string{"--leader-election"},
-		Args: []string{"--v=10"},
+		Args: []string{"--v=5"},
 		Env: []corev1.EnvVar{
 			{
 				Name:  "FULL_SYNC_INTERVAL_MINUTES",
@@ -590,8 +622,8 @@ func CSIProvisionerContainer(image string) corev1.Container {
 			"--v=5",
 			"--timeout=300s",
 			"--csi-address=$(ADDRESS)",
-			"--feature-gates=Topology=true",
-			"--strict-topology",
+			//"--feature-gates=Topology=true",
+			//"--strict-topology",
 			//"--enable-leader-election",
 			//"--leader-election-type=leases",
 		},
