@@ -1,7 +1,7 @@
 package cloudprovider
 
-var CalicoDefaultApplyConfigs = []string {
-`# Source: calico/templates/calico-config.yaml
+var CalicoDefaultApplyConfigs = []string{
+	`# Source: calico/templates/calico-config.yaml
 # This ConfigMap is used to configure a self-hosted Calico installation.
 kind: ConfigMap
 apiVersion: v1
@@ -55,7 +55,7 @@ data:
       ]
     }
 `,
-`# Source: calico/templates/calico-kube-controllers-rbac.yaml
+	`# Source: calico/templates/calico-kube-controllers-rbac.yaml
 
 # Include a clusterrole for the kube-controllers component,
 # and bind it to the calico-kube-controllers serviceaccount.
@@ -127,7 +127,7 @@ rules:
       # watch for changes
       - watch
 `,
-`kind: ClusterRoleBinding
+	`kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: calico-kube-controllers
@@ -140,7 +140,7 @@ subjects:
   name: calico-kube-controllers
   namespace: kube-system
 `,
-`# Source: calico/templates/calico-node-rbac.yaml
+	`# Source: calico/templates/calico-node-rbac.yaml
 # Include a clusterrole for the calico-node DaemonSet,
 # and bind it to the calico-node serviceaccount.
 kind: ClusterRole
@@ -281,7 +281,7 @@ rules:
       - get
 
 `,
-`apiVersion: rbac.authorization.k8s.io/v1
+	`apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: calico-node
@@ -295,7 +295,7 @@ subjects:
   namespace: kube-system
 
 `,
-`# Source: calico/templates/calico-node.yaml
+	`# Source: calico/templates/calico-node.yaml
 # This manifest installs the calico-node container, as well
 # as the CNI plugins and network config on
 # each master and worker node in a Kubernetes cluster.
@@ -342,6 +342,7 @@ spec:
         # upgraded to use calico-ipam.
         - name: upgrade-ipam
           image: docker.io/calico/cni:v3.17.1
+	  imagePullPolicy: IfNotPresent
           command: ["/opt/cni/bin/calico-ipam", "-upgrade"]
           envFrom:
           - configMapRef:
@@ -369,6 +370,7 @@ spec:
         # and CNI network config file on each node.
         - name: install-cni
           image: docker.io/calico/cni:v3.17.1
+	  imagePullPolicy: IfNotPresent
           command: ["/opt/cni/bin/install"]
           envFrom:
           - configMapRef:
@@ -410,6 +412,7 @@ spec:
         # to communicate with Felix over the Policy Sync API.
         - name: flexvol-driver
           image: docker.io/calico/pod2daemon-flexvol:v3.17.1
+	  imagePullPolicy: IfNotPresent
           volumeMounts:
           - name: flexvol-driver-host
             mountPath: /host/driver
@@ -421,6 +424,7 @@ spec:
         # host.
         - name: calico-node
           image: docker.io/calico/node:v3.17.1
+	  imagePullPolicy: IfNotPresent
           envFrom:
           - configMapRef:
               # Allow KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT to be overridden for eBPF mode.
@@ -586,14 +590,14 @@ spec:
             type: DirectoryOrCreate
             path: /usr/libexec/kubernetes/kubelet-plugins/volume/exec/nodeagent~uds
 `,
-`apiVersion: v1
+	`apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: calico-node
   namespace: kube-system
 
 `,
-`# Source: calico/templates/calico-kube-controllers.yaml
+	`# Source: calico/templates/calico-kube-controllers.yaml
 # See https://github.com/projectcalico/kube-controllers
 apiVersion: apps/v1
 kind: Deployment
@@ -630,6 +634,7 @@ spec:
       containers:
         - name: calico-kube-controllers
           image: docker.io/calico/kube-controllers:v3.17.1
+	  imagePullPolicy: IfNotPresent
           env:
             # Choose which controllers to run.
             - name: ENABLED_CONTROLLERS
@@ -643,14 +648,14 @@ spec:
               - -r
 
 `,
-`apiVersion: v1
+	`apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: calico-kube-controllers
   namespace: kube-system
 
 `,
-`# This manifest creates a Pod Disruption Budget for Controller to allow K8s Cluster Autoscaler to evict
+	`# This manifest creates a Pod Disruption Budget for Controller to allow K8s Cluster Autoscaler to evict
 
 apiVersion: policy/v1beta1
 kind: PodDisruptionBudget

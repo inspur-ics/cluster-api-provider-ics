@@ -179,7 +179,7 @@ func (r clusterReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result, reterr er
 	clusterContext := &context.ClusterContext{
 		ControllerContext: r.ControllerContext,
 		Cluster:           cluster,
-		ICSCluster:    icsCluster,
+		ICSCluster:        icsCluster,
 		Logger:            r.Logger.WithName(req.Namespace).WithName(req.Name),
 		PatchHelper:       patchHelper,
 	}
@@ -712,6 +712,10 @@ func (r clusterReconciler) reconcileStorageProvider(ctx *context.ClusterContext)
 		storageConfig.AttacherImage = cloudprovider.DefaultCSIAttacherImage
 	}
 
+	if storageConfig.ResizerImage == "" {
+		storageConfig.ResizerImage = cloudprovider.DefaultCSIResizerImage
+	}
+
 	if storageConfig.ProvisionerImage == "" {
 		storageConfig.ProvisionerImage = cloudprovider.DefaultCSIProvisionerImage
 	}
@@ -1057,7 +1061,7 @@ func (r clusterReconciler) reconcileDynamicResource(
 	}
 
 	dbObj, _ := dynamicResource.Get(obj.GetName(), metav1.GetOptions{})
-	if dbObj != nil  {
+	if dbObj != nil {
 		return nil
 	}
 
@@ -1076,7 +1080,7 @@ func (r clusterReconciler) GetDataCenterInfo(ctx *context.ClusterContext) *icsty
 		ctx.ICSCluster.Spec.CloudProviderConfiguration.Workspace.Datacenter,
 		r.ControllerManagerContext.Username, r.ControllerManagerContext.Password)
 	if err != nil {
-		r.Logger.Error(err,"failed to create ics session")
+		r.Logger.Error(err, "failed to create ics session")
 		return nil
 	}
 

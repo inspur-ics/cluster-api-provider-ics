@@ -141,6 +141,7 @@ func newICSCluster(lb *infrav1.HAProxyLoadBalancer) infrav1.ICSCluster {
 					Storage: &infrav1.CPIStorageConfig{
 						ControllerImage:     cloudprovidersvc.DefaultCSIControllerImage,
 						NodeDriverImage:     cloudprovidersvc.DefaultCSINodeDriverImage,
+						ResizerImage:        cloudprovidersvc.DefaultCSIResizerImage,
 						AttacherImage:       cloudprovidersvc.DefaultCSIAttacherImage,
 						ProvisionerImage:    cloudprovidersvc.DefaultCSIProvisionerImage,
 						MetadataSyncerImage: cloudprovidersvc.DefaultCSIMetadataSyncerImage,

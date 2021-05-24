@@ -71,6 +71,7 @@ spec:
         livenessProbeImage: quay.io/k8scsi/livenessprobe:v2.1.0
         metadataSyncerImage: ics-csi-syncer:latest
         nodeDriverImage: ics-csi-driver:latest
+        resizerImage: quay.io/k8scsi/csi-resizer:v1.1.0
         provisionerImage: quay.io/k8scsi/csi-provisioner:v2.1.0
         registrarImage: quay.io/k8scsi/csi-node-driver-registrar:v2.1.0
     workspace:
