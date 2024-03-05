@@ -68,7 +68,7 @@ func (s service) Create(ctx *context.ClusterContext, wrapper Wrapper) (string, e
 	}
 
 	// Fetch the compute cluster resource by tracing the owner of the resource pool in use.
-	computeClusterRef, err := getComputeClusterResource(ctx, iCenterSession, template.Spec.Template.Spec.ResourcePool)
+	computeClusterRef, err := getComputeClusterResource(ctx, iCenterSession, template.Spec.Template.Spec.Cluster)
 	if err != nil {
 		logger.V(4).Error(err, "error fetching compute cluster resource")
 		return "", err
@@ -106,7 +106,7 @@ func (s service) DoesExist(ctx *context.ClusterContext, wrapper Wrapper, moduleU
 	}
 
 	// Fetch the compute cluster resource by tracing the owner of the resource pool in use.
-	computeClusterRef, err := getComputeClusterResource(ctx, iCenterSession, template.Spec.Template.Spec.ResourcePool)
+	computeClusterRef, err := getComputeClusterResource(ctx, iCenterSession, template.Spec.Template.Spec.Cluster)
 	if err != nil {
 		logger.V(4).Error(err, "error fetching compute cluster resource")
 		return false, err

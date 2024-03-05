@@ -283,7 +283,7 @@ func getNetworkSpecs(ctx *context.VMContext, devices []basetypv1.Nic,
 					netSpec.Netmask = *netmask
 					netSpec.Gateway = deviceSpec.Gateway4
 
-					_, err := infrautilv1.ReconcileIPAddress(ctx, *ip, netSpec)
+					_, err := infrautilv1.CreateOrUpdateIPAddress(ctx, *ip, netSpec)
 					if err != nil {
 						continue
 					}

@@ -68,7 +68,7 @@ func InitFlags(fs *pflag.FlagSet) {
 	flag.StringVar(
 		&managerOpts.MetricsBindAddress,
 		"metrics-addr",
-		"localhost:8080",
+		":8080",
 		"The address the metric endpoint binds to.")
 	flag.BoolVar(
 		&managerOpts.LeaderElection,
@@ -120,7 +120,7 @@ func InitFlags(fs *pflag.FlagSet) {
 		&managerOpts.EnableKeepAlive,
 		"enable-keep-alive",
 		defaultEnableKeepAlive,
-		"DEPRECATED: feature to enable keep alive handler in ics sessions. This functionality is enabled by default now",
+		"feature to enable keep alive handler in ics sessions. This functionality is enabled by default now",
 	)
 	flag.DurationVar(
 		&managerOpts.KeepAliveDuration,
@@ -184,7 +184,10 @@ func main() {
 				return err
 			}
 		} else {
-			if err := setupVAPIControllers(ctx, mgr); err != nil {
+			if err := setupControllers(ctx, mgr); err != nil {
+				return err
+			}
+			if err := setupWebhooks(ctx, mgr); err != nil {
 				return err
 			}
 		}
@@ -217,7 +220,23 @@ func main() {
 	}
 }
 
-func setupVAPIControllers(ctx *context.ControllerManagerContext, mgr ctrlmgr.Manager) error {
+func setupControllers(ctx *context.ControllerManagerContext, mgr ctrlmgr.Manager) error {
+	if err := controllers.AddClusterControllerToManager(ctx, mgr, &v1beta1.ICSCluster{}); err != nil {
+		return err
+	}
+	if err := controllers.AddMachineControllerToManager(ctx, mgr, &v1beta1.ICSMachine{}); err != nil {
+		return err
+	}
+	if err := controllers.AddVMControllerToManager(ctx, mgr); err != nil {
+		return err
+	}
+	if err := controllers.AddIPAddressControllerToManager(ctx, mgr); err != nil {
+		return err
+	}
+	return nil
+}
+
+func setupWebhooks(ctx *context.ControllerManagerContext, mgr ctrlmgr.Manager) error {
 	if err := (&v1beta1.ICSMachine{}).SetupWebhookWithManager(mgr); err != nil {
 		return err
 	}
@@ -243,19 +262,6 @@ func setupVAPIControllers(ctx *context.ControllerManagerContext, mgr ctrlmgr.Man
 		return err
 	}
 	if err := (&v1beta1.IPAddressList{}).SetupWebhookWithManager(mgr); err != nil {
-		return err
-	}
-
-	if err := controllers.AddClusterControllerToManager(ctx, mgr, &v1beta1.ICSCluster{}); err != nil {
-		return err
-	}
-	if err := controllers.AddMachineControllerToManager(ctx, mgr, &v1beta1.ICSMachine{}); err != nil {
-		return err
-	}
-	if err := controllers.AddVMControllerToManager(ctx, mgr); err != nil {
-		return err
-	}
-	if err := controllers.AddIPAddressControllerToManager(ctx, mgr); err != nil {
 		return err
 	}
 	return nil

@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Adds namespace to all resources.
+namespace: capics-system
+
+namePrefix: capics-
+
+commonLabels:
+  cluster.x-k8s.io/provider: "infrastructure-ics"
+
+resources:
+  - ../base
+  - ./crd

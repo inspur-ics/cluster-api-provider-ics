@@ -31,13 +31,8 @@ import (
 )
 
 const (
-	cloudsSecretKey = "clouds.yaml"
-	caSecretKey     = "cacert"
-)
-
-const (
-	UsernameKey = "username"
-	PasswordKey = "password"
+	CloudsSecretKey = "clouds.yaml"
+	CaSecretKey     = "cacert"
 )
 
 type Credentials struct {
@@ -166,10 +161,10 @@ func getCloudFromSecret(ctx context.Context, ctrlClient client.Client, secretNam
 		return emptyCloud, nil, err
 	}
 
-	content, ok := secret.Data[cloudsSecretKey]
+	content, ok := secret.Data[CloudsSecretKey]
 	if !ok {
 		return emptyCloud, nil, fmt.Errorf("ICS credentials secret %v did not contain key %v",
-			secretName, cloudsSecretKey)
+			secretName, CloudsSecretKey)
 	}
 	var clouds basev1.Clouds
 	if err = yaml.Unmarshal(content, &clouds); err != nil {
@@ -177,7 +172,7 @@ func getCloudFromSecret(ctx context.Context, ctrlClient client.Client, secretNam
 	}
 
 	// get caCert
-	caCert, ok := secret.Data[caSecretKey]
+	caCert, ok := secret.Data[CaSecretKey]
 	if !ok {
 		return clouds.Clouds[cloudName], nil, nil
 	}

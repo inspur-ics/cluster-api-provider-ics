@@ -55,6 +55,42 @@ var (
 			Value:     map[string]interface{}{},
 			FieldPath: []string{"spec", "selector", "matchLabels"},
 		},
+		{
+			Kind:      "ICSMachineTemplate",
+			Name:      "${CLUSTER_NAME}-control-plane",
+			Value:     env.DefaultDiskGiB,
+			FieldPath: []string{"spec", "template", "spec", "diskGiB"},
+		},
+		{
+			Kind:      "ICSMachineTemplate",
+			Name:      "${CLUSTER_NAME}-control-plane",
+			Value:     env.DefaultMemoryMiB,
+			FieldPath: []string{"spec", "template", "spec", "memoryMiB"},
+		},
+		{
+			Kind:      "ICSMachineTemplate",
+			Name:      "${CLUSTER_NAME}-control-plane",
+			Value:     env.DefaultNumCPUs,
+			FieldPath: []string{"spec", "template", "spec", "numCPUs"},
+		},
+		{
+			Kind:      "ICSMachineTemplate",
+			Name:      "${CLUSTER_NAME}-md-0",
+			Value:     env.DefaultDiskGiB,
+			FieldPath: []string{"spec", "template", "spec", "diskGiB"},
+		},
+		{
+			Kind:      "ICSMachineTemplate",
+			Name:      "${CLUSTER_NAME}-md-0",
+			Value:     env.DefaultMemoryMiB,
+			FieldPath: []string{"spec", "template", "spec", "memoryMiB"},
+		},
+		{
+			Kind:      "ICSMachineTemplate",
+			Name:      "${CLUSTER_NAME}-md-0",
+			Value:     env.DefaultNumCPUs,
+			FieldPath: []string{"spec", "template", "spec", "numCPUs"},
+		},
 	}
 
 	stringVars = []string{

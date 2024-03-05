@@ -34,7 +34,7 @@ type IPAddressSpec struct {
 	VMRef corev1.ObjectReference `json:"vmRef"`
 
 	// Template is the ICSMachineTemplate this was generated from.
-	TemplateRef corev1.ObjectReference `json:"templateRef"`
+	TemplateRef corev1.ObjectReference `json:"templateRef,omitempty"`
 
 	// +kubebuilder:validation:Maximum=128
 	// Prefix is the mask of the network as integer (max 128)

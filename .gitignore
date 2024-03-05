@@ -4,7 +4,7 @@
 *.dll
 *.so
 *.dylib
-manager
+/manager
 
 # Test binary, built with `go test -c`
 *.test
@@ -56,6 +56,8 @@ manager
 /_dist
 /bin/
 /hack/tools/bin/
+/out
+/.build
 
 # Emacs save files
 *~

@@ -24,52 +24,48 @@ import (
 	"github.com/inspur-ics/cluster-api-provider-ics/packaging/flavorgen/flavors/env"
 )
 
-func MultiNodeTemplateWithKubeVIP() []runtime.Object {
+func MultiNodeTemplateWithOutLoadBalancer() []runtime.Object {
 	icsCluster := newICSCluster()
-	cpMachineTemplate := newICSMachineTemplate(env.ClusterNameVar)
-	workerMachineTemplate := newICSMachineTemplate(fmt.Sprintf("%s-worker", env.ClusterNameVar))
-	controlPlane := newKubeadmControlplane(444, cpMachineTemplate, newKubeVIPFiles())
-	kubeadmJoinTemplate := newKubeadmConfigTemplate(fmt.Sprintf("%s%s", env.ClusterNameVar, env.MachineDeploymentNameSuffix), true)
-	cluster := newCluster(icsCluster, &controlPlane)
-	machineDeployment := newMachineDeployment(cluster, workerMachineTemplate, kubeadmJoinTemplate)
-	clusterResourceSet := newClusterResourceSet(cluster)
+	controlPlaneMachineTemplate := newICSMachineTemplate(fmt.Sprintf("%s-control-plane", env.ClusterNameVar))
+	workerMachineTemplate := newICSMachineTemplate(fmt.Sprintf("%s%s", env.ClusterNameVar, env.MachineDeploymentNameSuffix))
+	kubeadmControlPlane := newKubeadmControlplane(444, controlPlaneMachineTemplate, nil)
+	kubeadmWorkConfigTemplate := newKubeadmWorkConfigTemplate(fmt.Sprintf("%s%s", env.ClusterNameVar, env.MachineDeploymentNameSuffix), true)
+	cluster := newCluster(icsCluster, &kubeadmControlPlane)
+	machineDeployment := newMachineDeployment(cluster, workerMachineTemplate, kubeadmWorkConfigTemplate)
 	identitySecret := newIdentitySecret()
 
 	MultiNodeTemplate := []runtime.Object{
 		&cluster,
 		&icsCluster,
-		&cpMachineTemplate,
-		&workerMachineTemplate,
-		&controlPlane,
-		&kubeadmJoinTemplate,
+		&kubeadmControlPlane,
+		&controlPlaneMachineTemplate,
 		&machineDeployment,
-		&clusterResourceSet,
+		&workerMachineTemplate,
+		&kubeadmWorkConfigTemplate,
 		&identitySecret,
 	}
 
 	return MultiNodeTemplate
 }
 
-func MultiNodeTemplateWithExternalLoadBalancer() []runtime.Object {
-	icsCluster := newICSCluster()
-	cpMachineTemplate := newICSMachineTemplate(env.ClusterNameVar)
-	workerMachineTemplate := newICSMachineTemplate(fmt.Sprintf("%s-worker", env.ClusterNameVar))
-	controlPlane := newKubeadmControlplane(444, cpMachineTemplate, nil)
-	kubeadmJoinTemplate := newKubeadmConfigTemplate(fmt.Sprintf("%s%s", env.ClusterNameVar, env.MachineDeploymentNameSuffix), true)
-	cluster := newCluster(icsCluster, &controlPlane)
-	machineDeployment := newMachineDeployment(cluster, workerMachineTemplate, kubeadmJoinTemplate)
-	clusterResourceSet := newClusterResourceSet(cluster)
+func MultiNodeTemplateWithLoadBalancer() []runtime.Object {
+	icsCluster := newICSClusterWithLoadBalancer()
+	controlPlaneMachineTemplate := newICSMachineTemplate(fmt.Sprintf("%s-control-plane", env.ClusterNameVar))
+	workerMachineTemplate := newICSMachineTemplate(fmt.Sprintf("%s%s", env.ClusterNameVar, env.MachineDeploymentNameSuffix))
+	kubeadmControlPlane := newKubeadmControlplane(444, controlPlaneMachineTemplate, nil)
+	kubeadmWorkConfigTemplate := newKubeadmWorkConfigTemplate(fmt.Sprintf("%s%s", env.ClusterNameVar, env.MachineDeploymentNameSuffix), true)
+	cluster := newCluster(icsCluster, &kubeadmControlPlane)
+	machineDeployment := newMachineDeployment(cluster, workerMachineTemplate, kubeadmWorkConfigTemplate)
 	identitySecret := newIdentitySecret()
 
 	MultiNodeTemplate := []runtime.Object{
 		&cluster,
 		&icsCluster,
-		&cpMachineTemplate,
-		&workerMachineTemplate,
-		&controlPlane,
-		&kubeadmJoinTemplate,
+		&kubeadmControlPlane,
+		&controlPlaneMachineTemplate,
 		&machineDeployment,
-		&clusterResourceSet,
+		&workerMachineTemplate,
+		&kubeadmWorkConfigTemplate,
 		&identitySecret,
 	}
 

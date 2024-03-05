@@ -96,11 +96,6 @@ type VirtualMachineCloneSpec struct {
 	// +optional
 	Datastore string `json:"datastore,omitempty"`
 
-	// ResourcePool is the name or inventory path of the resource pool in which
-	// the virtual machine is created/located.
-	// +optional
-	ResourcePool string `json:"resourcePool,omitempty"`
-
 	// Network is the network configuration for this machine's VM.
 	Network NetworkSpec `json:"network"`
 

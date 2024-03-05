@@ -33,7 +33,7 @@ import (
 	basetypv1 "github.com/inspur-ics/ics-go-sdk/client/types"
 )
 
-func ReconcileIPAddress(ctx *context.VMContext, ipAddressName string, network basetypv1.Nic) (runtime.Object, error) {
+func CreateOrUpdateIPAddress(ctx *context.VMContext, ipAddressName string, network basetypv1.Nic) (runtime.Object, error) {
 	// Create or update the IPAddress resource.
 	ipAddress := &infrav1.IPAddress{
 		ObjectMeta: metav1.ObjectMeta{

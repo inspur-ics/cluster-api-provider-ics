@@ -129,7 +129,7 @@ func syncIPPool(ctx *context.VMContext, nic basetypv1.Nic) error {
 		return err
 	}
 	if ipAddresses.Items == nil {
-		_, _ = infrautilv1.ReconcileIPAddress(ctx, nic.IP, nic)
+		_, _ = infrautilv1.CreateOrUpdateIPAddress(ctx, nic.IP, nic)
 	}
 	return nil
 }

@@ -1038,7 +1038,6 @@ func autoConvert_v1alpha4_VirtualMachineCloneSpec_To_v1beta1_VirtualMachineClone
 	out.Datacenter = in.Datacenter
 	out.Cluster = in.Cluster
 	out.Datastore = in.Datastore
-	out.ResourcePool = in.ResourcePool
 	if err := Convert_v1alpha4_NetworkSpec_To_v1beta1_NetworkSpec(&in.Network, &out.Network, s); err != nil {
 		return err
 	}
@@ -1063,7 +1062,6 @@ func autoConvert_v1beta1_VirtualMachineCloneSpec_To_v1alpha4_VirtualMachineClone
 	out.Datacenter = in.Datacenter
 	out.Cluster = in.Cluster
 	out.Datastore = in.Datastore
-	out.ResourcePool = in.ResourcePool
 	if err := Convert_v1beta1_NetworkSpec_To_v1alpha4_NetworkSpec(&in.Network, &out.Network, s); err != nil {
 		return err
 	}

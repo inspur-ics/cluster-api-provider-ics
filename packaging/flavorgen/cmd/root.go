@@ -52,12 +52,11 @@ func RunRoot(command *cobra.Command) error {
 		return errors.Wrapf(err, "error accessing flag %s for command %s", flavorFlag, command.Name())
 	}
 	switch flavor {
-	case "vip":
-		util.PrintObjects(flavors.MultiNodeTemplateWithKubeVIP())
-	case "external-loadbalancer":
-		util.PrintObjects(flavors.MultiNodeTemplateWithExternalLoadBalancer())
+	case "loadbalancer":
+		util.PrintObjects(flavors.MultiNodeTemplateWithLoadBalancer())
 	default:
-		return errors.Errorf("invalid flavor")
+		//return errors.Errorf("invalid flavor")
+		util.PrintObjects(flavors.MultiNodeTemplateWithOutLoadBalancer())
 	}
 	return nil
 }

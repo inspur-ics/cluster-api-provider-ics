@@ -67,7 +67,7 @@ endif
 
 # Allow overriding manifest generation destination directory
 MANIFEST_ROOT ?= ./config
-CRD_ROOT ?= $(MANIFEST_ROOT)/crd/bases
+CRD_ROOT ?= $(MANIFEST_ROOT)/default/crd/bases
 WEBHOOK_ROOT ?= $(MANIFEST_ROOT)/webhook
 RBAC_ROOT ?= $(MANIFEST_ROOT)/rbac
 SKIP_RESOURCE_CLEANUP ?= false
@@ -226,7 +226,8 @@ generate-go: $(CONTROLLER_GEN) $(CONVERSION_GEN) ## Runs Go related generate tar
 .PHONY: generate-manifests
 generate-manifests: $(CONTROLLER_GEN) ## Generate manifests e.g. CRD, RBAC etc.
 	$(CONTROLLER_GEN) \
-		paths=./api/... \
+		paths=./api/v1alpha4 \
+		paths=./api/v1beta1 \
 		crd:crdVersions=v1 \
 		output:crd:dir=$(CRD_ROOT) \
 		output:webhook:dir=$(WEBHOOK_ROOT) \
@@ -242,7 +243,6 @@ generate-manifests: $(CONTROLLER_GEN) ## Generate manifests e.g. CRD, RBAC etc.
 
 $(RELEASE_DIR):
 	@mkdir -p $(RELEASE_DIR)
-
 
 $(BUILD_DIR):
 	@mkdir -p $(BUILD_DIR)
@@ -328,8 +328,8 @@ verify-conversions: $(CONVERSION_VERIFIER)  ## Verifies expected API conversion 
 
 .PHONY: flavors
 flavors: $(FLAVOR_DIR)
-	go run ./packaging/flavorgen -f vip > $(FLAVOR_DIR)/cluster-template.yaml
-	go run ./packaging/flavorgen -f external-loadbalancer > $(FLAVOR_DIR)/cluster-template-external-loadbalancer.yaml
+	go run ./packaging/flavorgen -f default > $(FLAVOR_DIR)/cluster-template.yaml
+	go run ./packaging/flavorgen -f loadbalancer > $(FLAVOR_DIR)/cluster-template-loadbalancer.yaml
 
 .PHONY: release-flavors ## Create release flavor manifests
 release-flavors: release-version-check
@@ -390,13 +390,16 @@ check: ## Verify and lint the project
 .PHONY: docker-build
 docker-build: ## Build the docker image for controller-manager
 	# docker buildx build --platform linux/$(ARCH) --output=type=docker \--pull --build-arg ldflags="$(LDFLAGS)" \
-	docker buildx build --platform linux/$(ARCH) --output=type=docker \
-		-t $(DEV_CONTROLLER_IMG):$(DEV_TAG) .
+#	docker buildx build --platform linux/$(ARCH) --output=type=docker \
+#		-t $(RELEASE_CONTROLLER_IMG):$(VERSION) .
+	DOCKER_BUILDKIT=1 docker buildx build --platform linux/$(ARCH) --output=type=docker \
+    		--pull --build-arg ldflags="$(LDFLAGS)" \
+    		-t $(RELEASE_CONTROLLER_IMG):$(VERSION) .
 
 .PHONY: docker-push
 docker-push: ## Push the docker image
 	docker buildx inspect capics &>/dev/null || docker buildx create --name capics
 	docker buildx build --builder capics --platform linux/amd64,linux/arm64 --output=type=registry \
 		--pull --build-arg ldflags="$(LDFLAGS)" \
-		-t $(DEV_CONTROLLER_IMG):$(DEV_TAG) .
+		-t $(DEV_CONTROLLER_IMG):$(VERSION) .
 	docker buildx rm capics

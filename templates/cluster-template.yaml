@@ -1,0 +1,189 @@
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  labels:
+    cluster.x-k8s.io/cluster-name: '${CLUSTER_NAME}'
+  name: '${CLUSTER_NAME}'
+  namespace: '${NAMESPACE}'
+spec:
+  clusterNetwork:
+    pods:
+      cidrBlocks:
+      - 192.168.0.0/16
+  controlPlaneRef:
+    apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+    kind: KubeadmControlPlane
+    name: '${CLUSTER_NAME}'
+  infrastructureRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: ICSCluster
+    name: '${CLUSTER_NAME}'
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: ICSCluster
+metadata:
+  name: '${CLUSTER_NAME}'
+  namespace: '${NAMESPACE}'
+spec:
+  cloudName: '${ICS_SERVER}'
+  identityRef:
+    kind: Secret
+    name: ${CLUSTER_NAME}-cloud-config
+  insecure: true
+---
+apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+kind: KubeadmControlPlane
+metadata:
+  name: '${CLUSTER_NAME}'
+  namespace: '${NAMESPACE}'
+spec:
+  kubeadmConfigSpec:
+    clusterConfiguration:
+      apiServer:
+        extraArgs:
+          cloud-provider: external
+      controllerManager:
+        extraArgs:
+          cloud-provider: external
+    initConfiguration:
+      nodeRegistration:
+        criSocket: /var/run/containerd/containerd.sock
+        kubeletExtraArgs:
+          cloud-provider: external
+        name: '{{ ds.meta_data.hostname }}'
+    joinConfiguration:
+      nodeRegistration:
+        criSocket: /var/run/containerd/containerd.sock
+        kubeletExtraArgs:
+          cloud-provider: external
+        name: '{{ ds.meta_data.hostname }}'
+    preKubeadmCommands:
+    - hostname "{{ ds.meta_data.hostname }}"
+    - echo "::1         ipv6-localhost ipv6-loopback" >/etc/hosts
+    - echo "127.0.0.1   localhost" >>/etc/hosts
+    - echo "127.0.0.1   {{ ds.meta_data.hostname }}" >>/etc/hosts
+    - echo "{{ ds.meta_data.hostname }}" >/etc/hostname
+    useExperimentalRetryJoin: true
+    users:
+    - name: capics
+      sshAuthorizedKeys:
+      - '${ICS_SSH_AUTHORIZED_KEY}'
+      sudo: ALL=(ALL) NOPASSWD:ALL
+  machineTemplate:
+    infrastructureRef:
+      apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+      kind: ICSMachineTemplate
+      name: ${CLUSTER_NAME}-control-plane
+  replicas: ${CONTROL_PLANE_MACHINE_COUNT}
+  version: '${KUBERNETES_VERSION}'
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: ICSMachineTemplate
+metadata:
+  name: ${CLUSTER_NAME}-control-plane
+  namespace: '${NAMESPACE}'
+spec:
+  template:
+    spec:
+      cloneMode: linkedClone
+      cloudName: '${ICS_SERVER}'
+      datastore: '${ICS_DATASTORE}'
+      diskGiB: ${MACHINE_DISK_SIZE}
+      identityRef:
+        kind: Secret
+        name: ${CLUSTER_NAME}-cloud-config
+      memoryMiB: ${MACHINE_MEMORY_SIZE}
+      network:
+        devices:
+        - dhcp4: true
+          networkName: '${ICS_NETWORK}'
+      numCPUs: ${MACHINE_CPU_COUNT}
+      template: '${ICS_TEMPLATE}'
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: MachineDeployment
+metadata:
+  labels:
+    cluster.x-k8s.io/cluster-name: '${CLUSTER_NAME}'
+  name: '${CLUSTER_NAME}-md-0'
+  namespace: '${NAMESPACE}'
+spec:
+  clusterName: '${CLUSTER_NAME}'
+  replicas: ${WORKER_MACHINE_COUNT}
+  selector:
+    matchLabels: {}
+  template:
+    metadata:
+      labels:
+        cluster.x-k8s.io/cluster-name: '${CLUSTER_NAME}'
+    spec:
+      bootstrap:
+        configRef:
+          apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+          kind: KubeadmConfigTemplate
+          name: '${CLUSTER_NAME}-md-0'
+      clusterName: '${CLUSTER_NAME}'
+      infrastructureRef:
+        apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+        kind: ICSMachineTemplate
+        name: '${CLUSTER_NAME}-md-0'
+      version: '${KUBERNETES_VERSION}'
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: ICSMachineTemplate
+metadata:
+  name: '${CLUSTER_NAME}-md-0'
+  namespace: '${NAMESPACE}'
+spec:
+  template:
+    spec:
+      cloneMode: linkedClone
+      cloudName: '${ICS_SERVER}'
+      datastore: '${ICS_DATASTORE}'
+      diskGiB: ${MACHINE_DISK_SIZE}
+      identityRef:
+        kind: Secret
+        name: ${CLUSTER_NAME}-cloud-config
+      memoryMiB: ${MACHINE_MEMORY_SIZE}
+      network:
+        devices:
+        - dhcp4: true
+          networkName: '${ICS_NETWORK}'
+      numCPUs: ${MACHINE_CPU_COUNT}
+      template: '${ICS_TEMPLATE}'
+---
+apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+kind: KubeadmConfigTemplate
+metadata:
+  name: '${CLUSTER_NAME}-md-0'
+  namespace: '${NAMESPACE}'
+spec:
+  template:
+    spec:
+      joinConfiguration:
+        nodeRegistration:
+          criSocket: /var/run/containerd/containerd.sock
+          kubeletExtraArgs:
+            cloud-provider: external
+          name: '{{ ds.meta_data.hostname }}'
+      preKubeadmCommands:
+      - hostname "{{ ds.meta_data.hostname }}"
+      - echo "::1         ipv6-localhost ipv6-loopback" >/etc/hosts
+      - echo "127.0.0.1   localhost" >>/etc/hosts
+      - echo "127.0.0.1   {{ ds.meta_data.hostname }}" >>/etc/hosts
+      - echo "{{ ds.meta_data.hostname }}" >/etc/hostname
+      users:
+      - name: capics
+        sshAuthorizedKeys:
+        - '${ICS_SSH_AUTHORIZED_KEY}'
+        sudo: ALL=(ALL) NOPASSWD:ALL
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${CLUSTER_NAME}-cloud-config
+  namespace: '${NAMESPACE}'
+stringData:
+  cacert: ${ICS_SERVER_CACERT_B64}
+  clouds.yaml: ${ICS_SERVER_YAML_B64}

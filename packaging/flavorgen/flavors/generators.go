@@ -17,22 +17,22 @@ limitations under the License.
 package flavors
 
 import (
+	"fmt"
+
+	infrav1 "github.com/inspur-ics/cluster-api-provider-ics/api/v1beta1"
+	"github.com/inspur-ics/cluster-api-provider-ics/packaging/flavorgen/flavors/env"
+	"github.com/inspur-ics/cluster-api-provider-ics/packaging/flavorgen/flavors/util"
+	"github.com/inspur-ics/cluster-api-provider-ics/pkg/identity"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	bootstrapv1 "sigs.k8s.io/cluster-api/bootstrap/kubeadm/api/v1beta1"
 	controlplanev1 "sigs.k8s.io/cluster-api/controlplane/kubeadm/api/v1beta1"
-	addonsv1 "sigs.k8s.io/cluster-api/exp/addons/api/v1beta1"
-	"sigs.k8s.io/yaml"
-
-	infrav1 "github.com/inspur-ics/cluster-api-provider-ics/api/v1beta1"
-	"github.com/inspur-ics/cluster-api-provider-ics/packaging/flavorgen/flavors/env"
-	"github.com/inspur-ics/cluster-api-provider-ics/packaging/flavorgen/flavors/util"
-	"github.com/inspur-ics/cluster-api-provider-ics/pkg/identity"
 )
 
 func newICSCluster() infrav1.ICSCluster {
+	isSecure := true
 	return infrav1.ICSCluster{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: infrav1.GroupVersion.String(),
@@ -45,10 +45,33 @@ func newICSCluster() infrav1.ICSCluster {
 		Spec: infrav1.ICSClusterSpec{
 			CloudName:     env.ICSServerVar,
 			IdentityRef: &infrav1.ICSIdentityReference{
-				Name: env.ClusterNameVar,
+				Name: fmt.Sprintf("%s-cloud-config", env.ClusterNameVar),
 				Kind: infrav1.SecretKind,
 			},
-			ControlPlaneEndpoint: infrav1.APIEndpoint{
+			Insecure:        &isSecure,
+		},
+	}
+}
+
+func newICSClusterWithLoadBalancer() infrav1.ICSCluster {
+	isSecure := true
+	return infrav1.ICSCluster{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: infrav1.GroupVersion.String(),
+			Kind:       util.TypeToKind(&infrav1.ICSCluster{}),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      env.ClusterNameVar,
+			Namespace: env.NamespaceVar,
+		},
+		Spec: infrav1.ICSClusterSpec{
+			CloudName:     env.ICSServerVar,
+			IdentityRef: &infrav1.ICSIdentityReference{
+				Name: fmt.Sprintf("%s-cloud-config", env.ClusterNameVar),
+				Kind: infrav1.SecretKind,
+			},
+			Insecure:        &isSecure,
+			ControlPlaneEndpoint: clusterv1.APIEndpoint{
 				Host: env.ControlPlaneEndpointVar,
 				Port: 6443,
 			},
@@ -120,7 +143,12 @@ func defaultVirtualMachineSpec() infrav1.ICSMachineSpec {
 
 func defaultVirtualMachineCloneSpec() infrav1.VirtualMachineCloneSpec {
 	return infrav1.VirtualMachineCloneSpec{
-		Datacenter: env.ICSDataCenterVar,
+		CloudName:         env.ICSServerVar,
+		IdentityRef: &infrav1.ICSIdentityReference{
+			Name: fmt.Sprintf("%s-cloud-config", env.ClusterNameVar),
+			Kind: infrav1.SecretKind,
+		},
+		Datacenter:        env.ICSDataCenterVar,
 		Network: infrav1.NetworkSpec{
 			Devices: []infrav1.NetworkDeviceSpec{
 				{
@@ -131,12 +159,10 @@ func defaultVirtualMachineCloneSpec() infrav1.VirtualMachineCloneSpec {
 			},
 		},
 		CloneMode:         infrav1.LinkedClone,
-		NumCPUs:           env.DefaultNumCPUs,
-		DiskGiB:           env.DefaultDiskGiB,
-		MemoryMiB:         env.DefaultMemoryMiB,
+		NumCPUs:           2,
+		DiskGiB:           20,
+		MemoryMiB:         8192,
 		Template:          env.ICSTemplateVar,
-		CloudName:         env.ICSServerVar,
-		ResourcePool:      env.ICSResourcePoolVar,
 		Datastore:         env.ICSDatastoreVar,
 	}
 }
@@ -162,7 +188,7 @@ func defaultKubeadmInitSpec(files []bootstrapv1.File) bootstrapv1.KubeadmConfigS
 	}
 }
 
-func newKubeadmConfigTemplate(templateName string, addUsers bool) bootstrapv1.KubeadmConfigTemplate {
+func newKubeadmWorkConfigTemplate(templateName string, addUsers bool) bootstrapv1.KubeadmConfigTemplate {
 	template := bootstrapv1.KubeadmConfigTemplate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      templateName,
@@ -230,143 +256,6 @@ func defaultPreKubeadmCommands() []string {
 		"echo \"{{ ds.meta_data.hostname }}\" >/etc/hostname",
 	}
 }
-func kubeVIPPodSpec() *corev1.Pod {
-	hostPathType := corev1.HostPathFileOrCreate
-	pod := &corev1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       util.TypeToKind(&corev1.Pod{}),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "kube-vip",
-			Namespace: "kube-system",
-		},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name:            "kube-vip",
-					Image:           "ghcr.io/kube-vip/kube-vip:v0.4.2",
-					ImagePullPolicy: corev1.PullIfNotPresent,
-					Args: []string{
-						"manager",
-					},
-					Env: []corev1.EnvVar{
-						{
-							// Enables kube-vip control-plane functionality
-							Name:  "cp_enable",
-							Value: "true",
-						},
-						{
-							// Interface that the vip should bind to
-							Name:  "vip_interface",
-							Value: env.VipNetworkInterfaceVar,
-						},
-						{
-							// VIP IP address
-							// 'vip_address' was replaced by 'address'
-							Name:  "address",
-							Value: env.ControlPlaneEndpointVar,
-						},
-						{
-							// VIP TCP port
-							Name:  "port",
-							Value: "6443",
-						},
-						{
-							// Enables ARP brodcasts from Leader (requires L2 connectivity)
-							Name:  "vip_arp",
-							Value: "true",
-						},
-						{
-							// Kubernetes algorithm to be used.
-							Name:  "vip_leaderelection",
-							Value: "true",
-						},
-						{
-							// Seconds a lease is held for
-							Name:  "vip_leaseduration",
-							Value: "15",
-						},
-						{
-							// Seconds a leader can attempt to renew the lease
-							Name:  "vip_renewdeadline",
-							Value: "10",
-						},
-						{
-							// Number of times the leader will hold the lease for
-							Name:  "vip_retryperiod",
-							Value: "2",
-						},
-					},
-					SecurityContext: &corev1.SecurityContext{
-						Capabilities: &corev1.Capabilities{
-							Add: []corev1.Capability{
-								"NET_ADMIN",
-								"NET_RAW",
-							},
-						},
-					},
-					VolumeMounts: []corev1.VolumeMount{
-						{
-							MountPath: "/etc/kubernetes/admin.conf",
-							Name:      "kubeconfig",
-						},
-					},
-				},
-			},
-			HostNetwork: true,
-			HostAliases: []corev1.HostAlias{
-				{
-					IP: "127.0.0.1",
-					Hostnames: []string{
-						"kubernetes",
-					},
-				},
-			},
-			Volumes: []corev1.Volume{
-				{
-					Name: "kubeconfig",
-					VolumeSource: corev1.VolumeSource{
-						HostPath: &corev1.HostPathVolumeSource{
-							Path: "/etc/kubernetes/admin.conf",
-							Type: &hostPathType,
-						},
-					},
-				},
-			},
-		},
-	}
-	return pod
-}
-
-func kubeVIPPod() string {
-	pod := kubeVIPPodSpec()
-	podBytes, err := yaml.Marshal(pod)
-	if err != nil {
-		panic(err)
-	}
-	return string(podBytes)
-}
-
-func newClusterResourceSet(cluster clusterv1.Cluster) addonsv1.ClusterResourceSet {
-	crs := addonsv1.ClusterResourceSet{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       util.TypeToKind(&addonsv1.ClusterResourceSet{}),
-			APIVersion: addonsv1.GroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      cluster.Name + env.ClusterResourceSetNameSuffix,
-			Labels:    clusterLabels(),
-			Namespace: cluster.Namespace,
-		},
-		Spec: addonsv1.ClusterResourceSetSpec{
-			ClusterSelector: metav1.LabelSelector{MatchLabels: clusterLabels()},
-			Resources:       []addonsv1.ResourceRef{},
-		},
-	}
-
-	return crs
-}
 
 func newIdentitySecret() corev1.Secret {
 	return corev1.Secret{
@@ -376,11 +265,11 @@ func newIdentitySecret() corev1.Secret {
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: env.NamespaceVar,
-			Name:      env.ClusterNameVar,
+			Name:      fmt.Sprintf("%s-cloud-config", env.ClusterNameVar),
 		},
 		StringData: map[string]string{
-			identity.UsernameKey: env.ICSUsername,
-			identity.PasswordKey: env.ICSPassword,
+			identity.CloudsSecretKey: env.ICSServerConfig,
+			identity.CaSecretKey: env.ICSServerCa,
 		},
 	}
 }
@@ -420,16 +309,6 @@ func newMachineDeployment(cluster clusterv1.Cluster, machineTemplate infrav1.ICS
 					},
 				},
 			},
-		},
-	}
-}
-
-func newKubeVIPFiles() []bootstrapv1.File {
-	return []bootstrapv1.File{
-		{
-			Owner:   "root:root",
-			Path:    "/etc/kubernetes/manifests/kube-vip.yaml",
-			Content: kubeVIPPod(),
 		},
 	}
 }

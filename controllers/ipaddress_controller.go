@@ -120,7 +120,6 @@ type ipaddressReconciler struct {
 
 // Reconcile ensures the back-end state reflects the Kubernetes resource state intent.
 func (r ipaddressReconciler) Reconcile(ctx goctx.Context, req ctrl.Request) (_ ctrl.Result, reterr error) {
-
 	// Get the IPAddress resource for this request.
 	ipAddress := &infrav1.IPAddress{}
 	if err := r.Client.Get(r, req.NamespacedName, ipAddress); err != nil {
@@ -130,7 +129,6 @@ func (r ipaddressReconciler) Reconcile(ctx goctx.Context, req ctrl.Request) (_ c
 		}
 		return reconcile.Result{}, err
 	}
-
 	// Create the patch helper.
 	patchHelper, err := patch.NewHelper(ipAddress, r.Client)
 	if err != nil {
@@ -141,7 +139,6 @@ func (r ipaddressReconciler) Reconcile(ctx goctx.Context, req ctrl.Request) (_ c
 			ipAddress.Namespace,
 			ipAddress.Name)
 	}
-
 	// Fetch the ICSVM.
 	icsvm, err := r.getICSVMByIPAddress(r.ControllerContext, ipAddress)
 	if err != nil {
@@ -151,7 +148,6 @@ func (r ipaddressReconciler) Reconcile(ctx goctx.Context, req ctrl.Request) (_ c
 		r.Logger.Info("Waiting for ICSVM Controller to set vmRef on IPAddress")
 		return reconcile.Result{}, nil
 	}
-
 	// Fetch the CAPI Cluster.
 	cluster, err := clusterutilv1.GetClusterFromMetadata(r, r.Client, icsvm.ObjectMeta)
 	if err != nil {
@@ -163,7 +159,6 @@ func (r ipaddressReconciler) Reconcile(ctx goctx.Context, req ctrl.Request) (_ c
 			icsvm.Namespace, icsvm.Name)
 		return reconcile.Result{}, nil
 	}
-
 	// Fetch the ICSCluster
 	icsCluster := &infrav1.ICSCluster{}
 	icsClusterName := ctrlclient.ObjectKey{
