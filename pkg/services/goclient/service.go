@@ -259,7 +259,7 @@ func (vms *VMService) reconcileCloudInit(ctx *virtualMachineContext) (bool, erro
 		return false, errors.Errorf("get vm %s info err", ctx.Ref.Value)
 	}
 
-	if vmObj != nil && len(vmObj.ExtendData) > 0 {
+	if vmObj != nil && len(vmObj.CloudInit.UserData) > 0 {
 		return true, nil
 	}
 
