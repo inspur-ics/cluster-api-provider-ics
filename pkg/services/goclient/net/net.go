@@ -77,16 +77,16 @@ func GetNetworkStatus(
 	allNetStatus := []NetworkStatus{}
 	for _, nic := range vm.Nics {
 		mac := nic.Mac
-		ip := nic.AdvancedNetIP
+		ip := nic.IP
 		if &mac != nil {
 			netStatus := NetworkStatus{
 				MACAddr:     nic.Mac,
 				NetworkName: nic.DeviceName,
 				Connected:   false,
 			}
-			if &ip != nil {
+			if &ip != nil && len(ip) != 0 {
 				_ = syncIPPool(ctx, nic)
-				netStatus.IPAddrs = []string{ip.(string)}
+				netStatus.IPAddrs = []string{ip}
 				if strings.Compare("UP", nic.Status) == 0 {
 					netStatus.Connected = true
 				}

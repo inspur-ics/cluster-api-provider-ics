@@ -454,6 +454,7 @@ func (r vmReconciler) reconcileICenterConnectivity(ctx goctx.Context, machine *i
 	params := session.NewParams().
 		WithServer(iCenter.ICenterURL).
 		WithUserInfo(iCenter.AuthInfo.Username, iCenter.AuthInfo.Password).
+		WithAPIVersion(iCenter.APIVersion).
 		WithFeatures(session.Feature{
 			KeepAliveDuration: r.KeepAliveDuration,
 		})

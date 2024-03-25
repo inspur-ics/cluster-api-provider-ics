@@ -74,6 +74,7 @@ type Params struct {
 	server     string
 	userinfo   *url.Userinfo
 	feature    Feature
+	version    string
 }
 
 func NewParams() *Params {
@@ -89,6 +90,11 @@ func (p *Params) WithServer(server string) *Params {
 
 func (p *Params) WithUserInfo(username, password string) *Params {
 	p.userinfo = url.UserPassword(username, password)
+	return p
+}
+
+func (p *Params) WithAPIVersion(apiVersion string) *Params {
+	p.version = apiVersion
 	return p
 }
 
@@ -128,10 +134,11 @@ func GetOrCreate(ctx context.Context, params *Params) (*Session, error) {
 	}
 
 	icenterURL.User = params.userinfo
-	client, err := newClient(ctx, logger, sessionKey, icenterURL, params.feature)
+	client, err := newClient(ctx, logger, icenterURL)
 	if err != nil {
 		return nil, err
 	}
+	client.Client.Version = "6.12.0"
 
 	session := Session{client}
 	// Cache the session.
@@ -166,12 +173,12 @@ func parseURL(s string) (*url.URL, error) {
 	return u, nil
 }
 
-func newClient(ctx context.Context, logger logr.Logger, sessionKey string, url *url.URL, feature Feature) (*basegov1.ICSConnection, error) {
-	password, _ := url.User.Password();
+func newClient(ctx context.Context, logger logr.Logger, url *url.URL,) (*basegov1.ICSConnection, error) {
+	password, _ := url.User.Password()
 	c := &basegov1.ICSConnection{
 		Username: url.User.Username(),
 		Password: password,
-		Hostname: url.Host,
+		Hostname: url.Hostname(),
 		Insecure: true,
 		Port:     url.Port(),
 	}
@@ -207,12 +214,9 @@ func (s *Session) GetVersion() (infrav1.ICenterVersion, error) {
 	if err != nil {
 		return "", err
 	}
-
-	switch version.Major {
-	case 5:
-		return infrav1.NewICenterVersion(svcVersion), nil
-	default:
-		return "", unidentifiedICenterVersion{version: svcVersion}
+	miniVersion, _ := semver.Make("6.12.0")
+	if version.Compare(miniVersion) <= -1 {
+		return "", unidentifiedICenterVersion{version: s.Client.Version}
 	}
-	return "", unidentifiedICenterVersion{version: "5.8"}
+	return infrav1.NewICenterVersion(svcVersion), nil
 }

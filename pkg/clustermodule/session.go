@@ -38,9 +38,9 @@ func fetchSessionForObject(ctx *context.ClusterContext, template *infrav1.ICSMac
 		return nil, err
 	}
 
-	params.
-		WithServer(iCenter.ICenterURL).
-		WithUserInfo(iCenter.AuthInfo.Username, iCenter.AuthInfo.Password)
+	params.WithServer(iCenter.ICenterURL).
+		WithUserInfo(iCenter.AuthInfo.Username, iCenter.AuthInfo.Password).
+		WithAPIVersion(iCenter.APIVersion)
 	return session.GetOrCreate(ctx, params)
 }
 
@@ -59,7 +59,8 @@ func fetchSession(ctx *context.ClusterContext) (*session.Session, error) {
 
 	params := session.NewParams().
 		WithServer(iCenter.ICenterURL).
-		WithUserInfo(iCenter.AuthInfo.Username, iCenter.AuthInfo.Password)
+		WithUserInfo(iCenter.AuthInfo.Username, iCenter.AuthInfo.Password).
+		WithAPIVersion(iCenter.APIVersion)
 	return session.GetOrCreate(ctx, params)
 }
 

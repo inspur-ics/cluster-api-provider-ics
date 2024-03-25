@@ -33,6 +33,7 @@ import (
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	clusterutilv1 "sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/annotations"
+	"sigs.k8s.io/cluster-api/util/collections"
 	"sigs.k8s.io/cluster-api/util/conditions"
 	"sigs.k8s.io/cluster-api/util/patch"
 	"sigs.k8s.io/cluster-api/util/predicates"
@@ -282,6 +283,16 @@ func (r clusterReconciler) reconcileNormal(ctx *context.ClusterContext) (reconci
 		ctx.Logger.Error(err, "could not reconcile iCenter version")
 	}
 
+	// Reconcile the ICSCluster's load balancer.
+	if ok, err := r.reconcileLoadBalancer(ctx); !ok {
+		if err != nil {
+			return reconcile.Result{}, errors.Wrapf(err,
+				"unexpected error while reconciling load balancer for %s", ctx)
+		}
+		ctx.Logger.Info("load balancer is not reconciled")
+		return reconcile.Result{}, nil
+	}
+
 	ctx.ICSCluster.Status.Ready = true
 
 	// Reconcile the ICSCluster resource's control plane endpoint.
@@ -290,6 +301,15 @@ func (r clusterReconciler) reconcileNormal(ctx *context.ClusterContext) (reconci
 			return reconcile.Result{}, errors.Wrapf(err,
 				"unexpected error while reconciling control plane endpoint for %s", ctx)
 		}
+		ctx.Logger.Info("control plane endpoint is not reconciled")
+		return reconcile.Result{RequeueAfter: 10 * time.Second}, nil
+	}
+
+	// Ensure the ICSCluster is reconciled when the API server first comes online.
+	// A reconcile event will only be triggered if the Cluster is not marked as
+	// ControlPlaneInitialized.
+	r.reconcileICSClusterWhenAPIServerIsOnline(ctx)
+	if ctx.ICSCluster.Spec.ControlPlaneEndpoint.IsZero() {
 		ctx.Logger.Info("control plane endpoint is not reconciled")
 		return reconcile.Result{}, nil
 	}
@@ -337,6 +357,7 @@ func (r clusterReconciler) reconcileICenterConnectivity(ctx *context.ClusterCont
 	params := session.NewParams().
 		WithServer(iCenter.ICenterURL).
 		WithUserInfo(iCenter.AuthInfo.Username, iCenter.AuthInfo.Password).
+		WithAPIVersion(iCenter.APIVersion).
 		WithFeatures(session.Feature{
 			KeepAliveDuration: r.KeepAliveDuration,
 		})
@@ -352,63 +373,90 @@ func (r clusterReconciler) reconcileICenterVersion(ctx *context.ClusterContext, 
 	return nil
 }
 
-func (r clusterReconciler) reconcileControlPlaneEndpoint(ctx *context.ClusterContext) (bool, error) {
-	// Ensure the ICSCluster is reconciled when the API server first comes online.
-	// A reconcile event will only be triggered if the Cluster is not marked as
-	// ControlPlaneInitialized.
-	defer r.reconcileICSClusterWhenAPIServerIsOnline(ctx)
-
-	// If the cluster already has a control plane endpoint set then there
-	// is nothing to do.
+func (r clusterReconciler) reconcileLoadBalancer(ctx *context.ClusterContext) (bool, error) {
 	if !ctx.Cluster.Spec.ControlPlaneEndpoint.IsZero() {
 		ctx.ICSCluster.Spec.ControlPlaneEndpoint.Host = ctx.Cluster.Spec.ControlPlaneEndpoint.Host
 		ctx.ICSCluster.Spec.ControlPlaneEndpoint.Port = ctx.Cluster.Spec.ControlPlaneEndpoint.Port
-		ctx.Logger.Info("skipping control plane endpoint reconciliation",
-			"reason", "ControlPlaneEndpoint already set on Cluster",
-			"controlPlaneEndpoint", ctx.Cluster.Spec.ControlPlaneEndpoint.String())
-		return true, nil
 	}
 
-	if !ctx.ICSCluster.Spec.ControlPlaneEndpoint.IsZero() {
-		ctx.Logger.Info("skipping control plane endpoint reconciliation",
-			"reason", "ControlPlaneEndpoint already set on ICSCluster",
-			"controlPlaneEndpoint", ctx.ICSCluster.Spec.ControlPlaneEndpoint.String())
-		return true, nil
+	if ctx.ICSCluster.Spec.ControlPlaneEndpoint.IsZero() {
+		ctx.ICSCluster.Spec.ControlPlaneEndpoint.Host = "127.0.0.1"
+		ctx.ICSCluster.Spec.EnabledLoadBalancer = false
+	} else {
+		ctx.ICSCluster.Spec.EnabledLoadBalancer = true
 	}
 
-	// Get the CAPI Machine resources for the cluster.
-	machines, err := infrautilv1.GetMachinesInCluster(ctx, ctx.Client, ctx.ICSCluster.Namespace, ctx.ICSCluster.Name)
-	if err != nil {
-		return false, errors.Wrapf(err,
-			"failed to get Machinces for Cluster %s/%s",
+	// Update the ICSCluster.Spec.ControlPlaneEndpoint with the address
+	// from the load balancer.
+	// The control plane endpoint also requires a port, which is obtained
+	// either from the ICSCluster.Spec.ControlPlaneEndpoint.Port
+	// or the default port is used.
+	if ctx.ICSCluster.Spec.ControlPlaneEndpoint.Port == 0 {
+		ctx.ICSCluster.Spec.ControlPlaneEndpoint.Port = defaultAPIEndpointPort
+	}
+	ctx.Logger.Info("ControlPlaneEndpoint discovered via load balancer",
+		"controlPlaneEndpoint", ctx.ICSCluster.Spec.ControlPlaneEndpoint.String())
+
+	return true, nil
+}
+
+
+func (r clusterReconciler) reconcileControlPlaneEndpoint(ctx *context.ClusterContext) (bool, error) {
+	ctx.Logger.Info("Reconciling control plane endpoint")
+	if ctx.ICSCluster.Spec.EnabledLoadBalancer {
+		if !ctx.Cluster.Spec.ControlPlaneEndpoint.IsZero() {
+			ctx.ICSCluster.Spec.ControlPlaneEndpoint.Host = ctx.Cluster.Spec.ControlPlaneEndpoint.Host
+			ctx.ICSCluster.Spec.ControlPlaneEndpoint.Port = ctx.Cluster.Spec.ControlPlaneEndpoint.Port
+			conditions.MarkTrue(ctx.ICSCluster, infrav1.LoadBalancerReadyCondition)
+			ctx.Logger.Info("skipping control plane endpoint reconciliation",
+				"reason", "ControlPlaneEndpoint already set on Cluster",
+				"controlPlaneEndpoint", ctx.Cluster.Spec.ControlPlaneEndpoint.String())
+			return true, nil
+		}
+
+		if !ctx.ICSCluster.Spec.ControlPlaneEndpoint.IsZero() {
+			conditions.MarkTrue(ctx.ICSCluster, infrav1.LoadBalancerReadyCondition)
+			ctx.Logger.Info("skipping control plane endpoint reconciliation",
+				"reason", "ControlPlaneEndpoint already set on icsCluster",
+				"controlPlaneEndpoint", ctx.ICSCluster.Spec.ControlPlaneEndpoint.String())
+			return true, nil
+		}
+
+		return false, errors.Wrapf(errors.New("no load-balanced control plane endpoint"),
+			"failed to reconcile loadbalanced endpoint for icsCluster %s/%s",
 			ctx.ICSCluster.Namespace, ctx.ICSCluster.Name)
 	}
 
+	machines, err := collections.GetFilteredMachinesForCluster(ctx, r.Client, ctx.Cluster, collections.ControlPlaneMachines(ctx.Cluster.Name))
+	if err != nil {
+		return false, errors.Wrapf(err,
+			"failed to get Machines for Cluster %s/%s",
+			ctx.ICSCluster.Namespace, ctx.ICSCluster.Name)
+	}
+	if !ctx.ICSCluster.Spec.EnabledLoadBalancer && len(machines) <= 0 {
+		return false, nil
+	}
+	// Define a variable to assign the API endpoints of control plane
+	// machines as they are discovered.
+	var apiEndpointList []clusterv1.APIEndpoint //nolint:prealloc
+
 	// Iterate over the cluster's control plane CAPI machines.
 	for _, machine := range machines {
-		if !clusterutilv1.IsControlPlaneMachine(machine) {
-			continue
-		}
-
 		// Only machines with bootstrap data will have an IP address.
 		if machine.Spec.Bootstrap.DataSecretName == nil {
-			ctx.Logger.V(4).Info(
+			ctx.Logger.V(5).Info(
 				"skipping machine while looking for IP address",
-				"machine-name", machine.Name,
-				"skip-reason", "nilBootstrapData")
+				"reason", "bootstrap.DataSecretName is nil",
+				"machine-name", machine.Name)
 			continue
 		}
-
 		// Get the ICSMachine for the CAPI Machine resource.
 		icsMachine, err := infrautilv1.GetICSMachineByName(ctx, ctx.Client, machine.Namespace, machine.Name)
 		if err != nil {
 			return false, errors.Wrapf(err,
-				"failed to get ICSMachine for Machine %s/%s/%s",
-				machine.GroupVersionKind(),
-				machine.Namespace,
-				machine.Name)
+				"failed to get icsMachine for Machine %s/%s/%s",
+				ctx.ICSCluster.Namespace, ctx.ICSCluster.Name, machine.Name)
 		}
-
 		// Get the ICSMachine's preferred IP address.
 		ipAddr, err := infrautilv1.GetMachinePreferredIPAddress(icsMachine)
 		if err != nil {
@@ -421,23 +469,36 @@ func (r clusterReconciler) reconcileControlPlaneEndpoint(ctx *context.ClusterCon
 				icsMachine.Namespace,
 				icsMachine.Name)
 		}
-
-		// Set the ControlPlaneEndpoint so the CAPI controller can read the
-		// value into the analogous CAPI Cluster using an UnstructuredReader.
+		// Append the control plane machine's IP address to the list of API
+		// endpoints for this cluster so that they can be read into the
+		// analogous CAPI cluster via an unstructured reader.
 		apiEndpoint := clusterv1.APIEndpoint{
 			Host: ipAddr,
 			Port: defaultAPIEndpointPort,
 		}
-		//ctx.ICSCluster.Spec.ControlPlaneEndpoint.Host = ipAddr
-		//ctx.ICSCluster.Spec.ControlPlaneEndpoint.Port = defaultAPIEndpointPort
-		ctx.ICSCluster.Spec.ControlPlaneEndpoint = apiEndpoint
-		ctx.Logger.Info(
-			"ControlPlaneEndpoin discovered via control plane machine",
-			"controlPlaneEndpoint", ctx.ICSCluster.Spec.ControlPlaneEndpoint)
-		return true, nil
+		apiEndpointList = append(apiEndpointList, apiEndpoint)
+		ctx.Logger.V(3).Info(
+			"found API endpoint via control plane machine",
+			"host", apiEndpoint.Host,
+			"port", apiEndpoint.Port)
 	}
 
-	return false, errors.Errorf("unable to determine control plane endpoint for %s", ctx)
+	// The reconciliation is only successful if some API endpoints were
+	// discovered. Otherwise return an error so the cluster is requeued
+	// for reconciliation.
+	if len(apiEndpointList) == 0 {
+		return false, errors.Wrapf(err,
+			"failed to reconcile API endpoints for %s/%s",
+			ctx.ICSCluster.Namespace, ctx.ICSCluster.Name)
+	}
+
+	// Update the icsCluster's list of APIEndpoints.
+	ctx.ICSCluster.Spec.ControlPlaneEndpoint = apiEndpointList[0]
+	ctx.Logger.Info(
+		"ControlPlaneEndpoin discovered via control plane machine",
+		"controlPlaneEndpoint", ctx.ICSCluster.Spec.ControlPlaneEndpoint)
+
+	return true, nil
 }
 
 var (

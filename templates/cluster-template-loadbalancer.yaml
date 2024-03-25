@@ -30,6 +30,7 @@ spec:
   controlPlaneEndpoint:
     host: ${CONTROL_PLANE_ENDPOINT_IP}
     port: 6443
+  enabledLoadBalancer: true
   identityRef:
     kind: Secret
     name: ${CLUSTER_NAME}-cloud-config
@@ -183,10 +184,10 @@ spec:
         sudo: ALL=(ALL) NOPASSWD:ALL
 ---
 apiVersion: v1
+data:
+  cacert: ${ICS_SERVER_CACERT_B64}
+  clouds.yaml: ${ICS_SERVER_YAML_B64}
 kind: Secret
 metadata:
   name: ${CLUSTER_NAME}-cloud-config
   namespace: '${NAMESPACE}'
-stringData:
-  cacert: ${ICS_SERVER_CACERT_B64}
-  clouds.yaml: ${ICS_SERVER_YAML_B64}
