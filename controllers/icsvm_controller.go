@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/inspur-ics/cluster-api-provider-ics/pkg/clustermodule"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/identity"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/session"
@@ -48,11 +49,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	infrav1 "github.com/inspur-ics/cluster-api-provider-ics/api/v1beta1"
-	"github.com/inspur-ics/cluster-api-provider-ics/pkg/clustermodule"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/record"
 	basev1 "github.com/inspur-ics/cluster-api-provider-ics/pkg/services/goclient"
-	"github.com/inspur-ics/cluster-api-provider-ics/pkg/util"
+	infrautilv1 "github.com/inspur-ics/cluster-api-provider-ics/pkg/util"
 )
 
 // +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=icsvms,verbs=get;list;watch;create;update;patch;delete
@@ -165,7 +165,7 @@ func (r vmReconciler) Reconcile(ctx goctx.Context, req ctrl.Request) (_ ctrl.Res
 	}
 
 	// Fetch the owner ICSMachine.
-	icsMachine, err := util.GetOwnerICSMachine(r, r.Client, icsVM.ObjectMeta)
+	icsMachine, err := infrautilv1.GetOwnerICSMachine(r, r.Client, icsVM.ObjectMeta)
 	// icsMachine can be nil in cases where custom mover other than clusterctl
 	// moves the resources without ownerreferences set
 	// in that case nil icsMachine can cause panic and CrashLoopBackOff the pod
@@ -175,19 +175,7 @@ func (r vmReconciler) Reconcile(ctx goctx.Context, req ctrl.Request) (_ ctrl.Res
 		return reconcile.Result{}, nil
 	}
 
-	if err := r.reconcileIdentitySecret(ctx, icsMachine); err != nil {
-		conditions.MarkFalse(icsMachine, infrav1.ICenterAvailableCondition, infrav1.ICenterUnreachableReason, clusterv1.ConditionSeverityError, err.Error())
-		return reconcile.Result{}, err
-	}
-
-	authSession, err := r.reconcileICenterConnectivity(ctx, icsMachine)
-	if err != nil {
-		conditions.MarkFalse(icsVM, infrav1.ICenterAvailableCondition, infrav1.ICenterUnreachableReason, clusterv1.ConditionSeverityError, err.Error())
-		return reconcile.Result{}, err
-	}
-	conditions.MarkTrue(icsVM, infrav1.ICenterAvailableCondition)
-
-	icsCluster, err := util.GetICSClusterFromICSMachine(r, r.Client, icsMachine)
+	icsCluster, err := infrautilv1.GetICSClusterFromICSMachine(r, r.Client, icsMachine)
 	if err != nil || icsCluster == nil {
 		r.Logger.Info("ICSCluster not found, won't reconcile", "key", ctrlclient.ObjectKeyFromObject(icsMachine))
 		return reconcile.Result{}, nil
@@ -213,7 +201,7 @@ func (r vmReconciler) Reconcile(ctx goctx.Context, req ctrl.Request) (_ ctrl.Res
 		ControllerContext: r.ControllerContext,
 		ClusterModuleInfo: clusterModule,
 		ICSVM:             icsVM,
-		Session:           authSession,
+		Session:           nil,
 		Logger:            r.Logger.WithName(req.Namespace).WithName(req.Name),
 		PatchHelper:       patchHelper,
 	}
@@ -263,26 +251,32 @@ func (r vmReconciler) Reconcile(ctx goctx.Context, req ctrl.Request) (_ ctrl.Res
 	}
 
 	// Handle non-deleted machines
-	return r.reconcileNormal(vmContext)
+	return r.reconcileNormal(vmContext, icsMachine)
 }
 
 func (r vmReconciler) reconcileDelete(ctx *context.VMContext) (reconcile.Result, error) {
 	ctx.Logger.Info("Handling deleted ICSVM")
 
-	// Implement selection of VM service based on ICS version
-	var vmService services.VirtualMachineService = &basev1.VMService{}
+	authSession, err := r.reconcileICenterConnectivity(ctx)
+	if err == nil {
+		conditions.MarkTrue(ctx.ICSVM, infrav1.ICenterAvailableCondition)
+		ctx.Session = authSession
 
-	conditions.MarkFalse(ctx.ICSVM, infrav1.VMProvisionedCondition, clusterv1.DeletingReason, clusterv1.ConditionSeverityInfo, "")
-	vm, err := vmService.DestroyVM(ctx)
-	if err != nil {
-		conditions.MarkFalse(ctx.ICSVM, infrav1.VMProvisionedCondition, "DeletionFailed", clusterv1.ConditionSeverityWarning, err.Error())
-		return reconcile.Result{}, errors.Wrapf(err, "failed to destroy VM")
-	}
+		// Implement selection of VM service based on ICS version
+		var vmService services.VirtualMachineService = &basev1.VMService{}
 
-	// Requeue the operation until the VM is "notfound".
-	if vm.State != infrav1.VirtualMachineStateNotFound {
-		ctx.Logger.Info("vm state is not reconciled", "expected-vm-state", infrav1.VirtualMachineStateNotFound, "actual-vm-state", vm.State)
-		return reconcile.Result{}, nil
+		conditions.MarkFalse(ctx.ICSVM, infrav1.VMProvisionedCondition, clusterv1.DeletingReason, clusterv1.ConditionSeverityInfo, "")
+		vm, err := vmService.DestroyVM(ctx)
+		if err != nil {
+			conditions.MarkFalse(ctx.ICSVM, infrav1.VMProvisionedCondition, "DeletionFailed", clusterv1.ConditionSeverityWarning, err.Error())
+			return reconcile.Result{}, errors.Wrapf(err, "failed to destroy VM")
+		}
+
+		// Requeue the operation until the VM is "notfound".
+		if vm.State != infrav1.VirtualMachineStateNotFound {
+			ctx.Logger.Info("vm state is not reconciled", "expected-vm-state", infrav1.VirtualMachineStateNotFound, "actual-vm-state", vm.State)
+			return reconcile.Result{}, nil
+		}
 	}
 
 	// The VM is deleted so remove the finalizer.
@@ -291,13 +285,27 @@ func (r vmReconciler) reconcileDelete(ctx *context.VMContext) (reconcile.Result,
 	return reconcile.Result{}, nil
 }
 
-func (r vmReconciler) reconcileNormal(ctx *context.VMContext) (reconcile.Result, error) {
+func (r vmReconciler) reconcileNormal(ctx *context.VMContext, icsMachine *infrav1.ICSMachine) (reconcile.Result, error) {
 	if ctx.ICSVM.Status.FailureReason != nil || ctx.ICSVM.Status.FailureMessage != nil {
 		r.Logger.Info("VM is failed, won't reconcile", "namespace", ctx.ICSVM.Namespace, "name", ctx.ICSVM.Name)
 		return reconcile.Result{}, nil
 	}
 	// If the ICSVM doesn't have our finalizer, add it.
 	ctrlutil.AddFinalizer(ctx.ICSVM, infrav1.VMFinalizer)
+
+	if err := r.reconcileIdentitySecret(ctx); err != nil {
+		conditions.MarkFalse(icsMachine, infrav1.ICenterAvailableCondition, infrav1.ICenterUnreachableReason, clusterv1.ConditionSeverityError, err.Error())
+		return reconcile.Result{}, err
+	}
+
+	authSession, err := r.reconcileICenterConnectivity(ctx)
+	if err != nil {
+		conditions.MarkFalse(ctx.ICSVM, infrav1.ICenterAvailableCondition, infrav1.ICenterUnreachableReason, clusterv1.ConditionSeverityError, err.Error())
+		return reconcile.Result{}, err
+	}
+	conditions.MarkTrue(ctx.ICSVM, infrav1.ICenterAvailableCondition)
+
+	ctx.Session = authSession
 
 	// Implement selection of VM service based on ICS version
 	var vmService services.VirtualMachineService = &basev1.VMService{}
@@ -367,7 +375,7 @@ func (r vmReconciler) isWaitingForStaticIPAllocation(ctx *context.VMContext) boo
 }
 
 func (r vmReconciler) reconcileNetwork(ctx *context.VMContext, vm infrav1.VirtualMachine) {
-	util.UpdateNetworkInfo(ctx, vm.Network)
+	infrautilv1.UpdateNetworkInfo(ctx, vm.Network)
 }
 
 func (r vmReconciler) getClusterToICSVMsReq(a ctrlclient.Object) []reconcile.Request {
@@ -425,15 +433,19 @@ func (r vmReconciler) getICSClusterToICSVMsReq(a ctrlclient.Object) []reconcile.
 	return requests
 }
 
-func (r vmReconciler) reconcileIdentitySecret(ctx goctx.Context, machine *infrav1.ICSMachine) error {
-	if identity.IsMachineSecretIdentity(&machine.Spec) {
+func (r vmReconciler) reconcileIdentitySecret(ctx *context.VMContext) error {
+	icsVM := ctx.ICSVM
+	if identity.IsMachineSecretIdentity(icsVM.Spec.IdentityRef) {
 		secret := &corev1.Secret{}
 		secretKey := ctrlclient.ObjectKey{
-			Namespace: machine.Namespace,
-			Name:      machine.Spec.IdentityRef.Name,
+			Namespace: icsVM.Namespace,
+			Name:      icsVM.Spec.IdentityRef.Name,
 		}
 		err := r.Client.Get(ctx, secretKey, secret)
 		if err != nil {
+			if infrautilv1.IsNotFoundError(err) {
+				return nil
+			}
 			return err
 		}
 	}
@@ -441,19 +453,26 @@ func (r vmReconciler) reconcileIdentitySecret(ctx goctx.Context, machine *infrav
 	return nil
 }
 
-func (r vmReconciler) reconcileICenterConnectivity(ctx goctx.Context, machine *infrav1.ICSMachine) (*session.Session, error) {
-	if err := identity.ValidateMachineInputs(r.Client, machine); err != nil {
+func (r vmReconciler) reconcileICenterConnectivity(ctx *context.VMContext) (*session.Session, error) {
+	icsVM := ctx.ICSVM
+	if err := identity.ValidateMachineInputs(r.Client, icsVM); err != nil {
 		return nil, err
 	}
 
-	iCenter, err := identity.NewClientFromMachine(ctx, r.Client, machine.Namespace, &machine.Spec)
+	iCenter, err := identity.NewClientFromMachine(ctx, r.Client, icsVM.Namespace, icsVM.Spec.CloudName, icsVM.Spec.IdentityRef)
 	if err != nil {
+		if infrautilv1.IsNotFoundError(err) {
+			sessionKey := ctx.ICSVM.Spec.CloudName
+			return session.Get(ctx, sessionKey)
+		}
 		return nil, err
 	}
 
 	params := session.NewParams().
+		WithCloudName(ctx.ICSVM.Spec.CloudName).
 		WithServer(iCenter.ICenterURL).
 		WithUserInfo(iCenter.AuthInfo.Username, iCenter.AuthInfo.Password).
+		WithAPIVersion(iCenter.APIVersion).
 		WithFeatures(session.Feature{
 			KeepAliveDuration: r.KeepAliveDuration,
 		})
@@ -467,16 +486,16 @@ func (r vmReconciler) fetchClusterModuleInfo(icsCluster *infrav1.ICSCluster, mac
 	)
 	logger := r.Logger.WithName(machine.Namespace).WithName(machine.Name)
 
-	input := util.FetchObjectInput{
+	input := infrautilv1.FetchObjectInput{
 		Context: r.Context,
 		Client:  r.Client,
 		Object:  machine,
 	}
 	// Figure out a way to find the latest version of the CRD
-	if util.IsControlPlaneMachine(machine) {
-		owner, err = util.FetchControlPlaneOwnerObject(input)
+	if infrautilv1.IsControlPlaneMachine(machine) {
+		owner, err = infrautilv1.FetchControlPlaneOwnerObject(input)
 	} else {
-		owner, err = util.FetchMachineDeploymentOwnerObject(input)
+		owner, err = infrautilv1.FetchMachineDeploymentOwnerObject(input)
 	}
 	if err != nil {
 		// If the owner objects cannot be traced, we can assume that the objects

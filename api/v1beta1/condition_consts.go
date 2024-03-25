@@ -104,6 +104,19 @@ const (
 )
 
 const (
+	// LoadBalancerReadyCondition reports the successful reconciliation of
+	// a static control plane endpoint.
+	LoadBalancerReadyCondition clusterv1.ConditionType = "LoadBalancerReady"
+
+	// LoadBalancerCreationFailedReason is used when load balancer related
+	// resources creation fails.
+	LoadBalancerCreationFailedReason = "LoadBalancerCreationFailed"
+	// WaitingForLoadBalancerIPReason is used when waiting for load
+	// balancer IP to exist.
+	WaitingForLoadBalancerIPReason = "WaitingForLoadBalancerIP"
+)
+
+const (
 	// CredentialsAvailableCondidtion is used by ICSClusterIdentity when a credential
 	// secret is available and unused by other ICSClusterIdentities.
 	CredentialsAvailableCondidtion clusterv1.ConditionType = "CredentialsAvailable"

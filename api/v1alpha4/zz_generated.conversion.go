@@ -405,6 +405,7 @@ func autoConvert_v1alpha4_ICSClusterSpec_To_v1beta1_ICSClusterSpec(in *ICSCluste
 	out.CloudName = in.CloudName
 	out.IdentityRef = (*v1beta1.ICSIdentityReference)(unsafe.Pointer(in.IdentityRef))
 	out.Insecure = (*bool)(unsafe.Pointer(in.Insecure))
+	out.EnabledLoadBalancer = in.EnabledLoadBalancer
 	out.ControlPlaneEndpoint = in.ControlPlaneEndpoint
 	out.ClusterModules = *(*[]v1beta1.ClusterModule)(unsafe.Pointer(&in.ClusterModules))
 	return nil
@@ -419,6 +420,7 @@ func autoConvert_v1beta1_ICSClusterSpec_To_v1alpha4_ICSClusterSpec(in *v1beta1.I
 	out.CloudName = in.CloudName
 	out.IdentityRef = (*ICSIdentityReference)(unsafe.Pointer(in.IdentityRef))
 	out.Insecure = (*bool)(unsafe.Pointer(in.Insecure))
+	out.EnabledLoadBalancer = in.EnabledLoadBalancer
 	out.ControlPlaneEndpoint = in.ControlPlaneEndpoint
 	out.ClusterModules = *(*[]ClusterModule)(unsafe.Pointer(&in.ClusterModules))
 	return nil
@@ -456,6 +458,7 @@ func Convert_v1beta1_ICSClusterStatus_To_v1alpha4_ICSClusterStatus(in *v1beta1.I
 func autoConvert_v1alpha4_ICSIdentityReference_To_v1beta1_ICSIdentityReference(in *ICSIdentityReference, out *v1beta1.ICSIdentityReference, s conversion.Scope) error {
 	out.Kind = v1beta1.ICSIdentityKind(in.Kind)
 	out.Name = in.Name
+	out.IdentityKey = (*string)(unsafe.Pointer(in.IdentityKey))
 	return nil
 }
 
@@ -467,6 +470,7 @@ func Convert_v1alpha4_ICSIdentityReference_To_v1beta1_ICSIdentityReference(in *I
 func autoConvert_v1beta1_ICSIdentityReference_To_v1alpha4_ICSIdentityReference(in *v1beta1.ICSIdentityReference, out *ICSIdentityReference, s conversion.Scope) error {
 	out.Kind = ICSIdentityKind(in.Kind)
 	out.Name = in.Name
+	out.IdentityKey = (*string)(unsafe.Pointer(in.IdentityKey))
 	return nil
 }
 

@@ -144,7 +144,7 @@ func reconcileInFlightTask(ctx *context.VMContext) (bool, error) {
 		return true, nil
 	case "READY":
 		return true, nil
-	case "FINISHED":
+	case "CANCELED", "FINISHED":
 		ctx.ICSVM.Status.TaskRef = ""
 		return false, nil
 	case "ERROR":

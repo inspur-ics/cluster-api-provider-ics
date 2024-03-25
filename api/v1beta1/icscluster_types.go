@@ -51,6 +51,10 @@ type ICSClusterSpec struct {
 	// +optional
 	Insecure *bool `json:"insecure,omitempty"`
 
+	// Enabled defines whether a LoadBalancer should be created.
+	// +optional
+	EnabledLoadBalancer bool `json:"enabledLoadBalancer,omitempty"`
+
 	// ControlPlaneEndpoint represents the endpoint used to communicate with the control plane.
 	// +optional
 	ControlPlaneEndpoint clusterv1.APIEndpoint `json:"controlPlaneEndpoint,omitempty"`

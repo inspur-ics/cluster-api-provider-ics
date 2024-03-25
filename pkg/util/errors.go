@@ -17,10 +17,9 @@ limitations under the License.
 package util
 
 import (
-	"net/http"
 	"strings"
 )
 
 func IsNotFoundError(err error) bool {
-	return strings.HasSuffix(err.Error(), http.StatusText(http.StatusNotFound))
+	return strings.Contains(strings.ToLower(err.Error()), "not found")
 }

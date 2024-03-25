@@ -22,9 +22,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"k8s.io/klog"
 
 	basetypv1 "github.com/inspur-ics/ics-go-sdk/client/types"
-	basecluv1 "github.com/inspur-ics/ics-go-sdk/cluster"
 	basehstv1 "github.com/inspur-ics/ics-go-sdk/host"
 	basenetv1 "github.com/inspur-ics/ics-go-sdk/network"
 	basestv1 "github.com/inspur-ics/ics-go-sdk/storage"
@@ -61,19 +61,13 @@ func ImportVM(ctx *context.VMContext, userdata string) error {
 		Logger:            ctx.Logger.WithName("icenter"),
 		PatchHelper:       ctx.PatchHelper,
 	}
-	imageName := ctx.ICSVM.Spec.Template + ".ova"
+	imageName := ctx.ICSVM.Spec.Template
 	ovaImage, err := image.FindOvaImageByName(ctx, imageName)
 	if err != nil {
 		ctx.Logger.Error(err, "failed to find the ova image from ics")
 		return errors.Wrapf(err, "unable to get ova image for %q", ctx)
 	}
-
-	clusterService := basecluv1.NewClusterService(ctx.Session.Client)
-	cluster, err := clusterService.GetClusterByName(ctx, ctx.ICSVM.Spec.Cluster)
-	if err != nil {
-		ctx.Logger.Error(err, "fail to find the cluster from ics")
-		return errors.Wrapf(err, "unable to get cluster for %q", ctx)
-	}
+	klog.Infof("DavidWang# FindOvaImageByName ovaImage: %+v", ovaImage)
 
 	storageService := basestv1.NewStorageService(ctx.GetSession().Client)
 	dataStore, err := storageService.GetStorageInfoByName(ctx, ctx.ICSVM.Spec.Datastore)
@@ -81,6 +75,7 @@ func ImportVM(ctx *context.VMContext, userdata string) error {
 		ctx.Logger.Error(err, "fail to find the data store from ics")
 		return errors.Wrapf(err, "unable to get DataStore for %q", ctx)
 	}
+	klog.Infof("DavidWang# GetStorageInfoByName dataStore: %+v", dataStore)
 
 	networks := make(map[int]basetypv1.Network)
 	networkService := basenetv1.NewNetworkService(ctx.GetSession().Client)
@@ -92,8 +87,9 @@ func ImportVM(ctx *context.VMContext, userdata string) error {
 		}
 		networks[index] = *network
 	}
+	klog.Infof("DavidWang# GetNetworkByName networks: %+v", networks)
 
-	host, err := getAvailableHosts(ctx, *cluster, *dataStore, networks)
+	host, err := getAvailableHosts(ctx, *dataStore, networks)
 	if err != nil {
 		ctx.Logger.Error(err, "fail to find the host from ics")
 		return errors.Wrapf(err, "unable to get available host for %q", ctx)
@@ -105,12 +101,21 @@ func ImportVM(ctx *context.VMContext, userdata string) error {
 		ctx.Logger.Error(err, "fail to find the vm template from ics")
 		return errors.Wrapf(err, "unable to get vm template for %q", ctx)
 	}
+	klog.Infof("DavidWang# vm template ovaConfig: %+v", ovaConfig)
 	vmForm := *ovaConfig
 	vmForm.UUID = uuid.New().String()
 	vmForm.Name = ctx.ICSVM.Name
 	vmForm.HostID = host.ID
 	vmForm.HostName = host.HostName
 	vmForm.HostIP = host.Name
+	vmForm.DataStoreID = dataStore.ID
+	if vmForm.CPUNum % 2 == 0 {
+		vmForm.CPUCore = 2
+		vmForm.CPUSocket = vmForm.CPUNum / vmForm.CPUCore
+	} else {
+		vmForm.CPUCore = 1
+		vmForm.CPUSocket = vmForm.CPUNum / vmForm.CPUCore
+	}
 
 	diskSpecs, err := getDiskSpecs(dataStore, ovaConfig.Disks)
 	if err != nil {
@@ -135,8 +140,10 @@ func ImportVM(ctx *context.VMContext, userdata string) error {
 		DataSourceType: "OPENSTACK",
 	}
 
+	klog.Infof("DavidWang# ImportVM, host id: %s, ovaFilePath: %s, vmForm: %+v", host.ID, ovaFilePath, vmForm)
+
 	virtualMachineService := basevmv1.NewVirtualMachineService(ctx.GetSession().Client)
-	task, err := virtualMachineService.ImportVM(ctx, vmForm, ovaFilePath, host.ID)
+	task, err := virtualMachineService.ImportVM(ctx, vmForm, ovaFilePath, ovaImage.ServerID, 100)
 	if err != nil {
 		ctx.Logger.Error(err, "failed to import vm by the ova image")
 		return errors.Wrapf(err, "error import vm for machine %s", ctx)
@@ -174,13 +181,6 @@ func CloneVM(ctx *context.VMContext, metadata []byte) error {
 	vmTemplate = *tpl
 	vmTemplate.Name = ctx.ICSVM.Name
 
-	clusterService := basecluv1.NewClusterService(ctx.Session.Client)
-	cluster, err := clusterService.GetClusterByName(ctx, ctx.ICSVM.Spec.Cluster)
-	if err != nil {
-		ctx.Logger.Error(err, "fail to find the cluster from ics")
-		return errors.Wrapf(err, "unable to get cluster for %q", ctx)
-	}
-
 	storageService := basestv1.NewStorageService(ctx.GetSession().Client)
 	dataStore, err := storageService.GetStorageInfoByName(ctx, ctx.ICSVM.Spec.Datastore)
 	if err != nil {
@@ -199,7 +199,7 @@ func CloneVM(ctx *context.VMContext, metadata []byte) error {
 		networks[index] = *network
 	}
 
-	host, err := getAvailableHosts(ctx, *cluster, *dataStore, networks)
+	host, err := getAvailableHosts(ctx, *dataStore, networks)
 	if err != nil {
 		ctx.Logger.Error(err, "fail to find the host from ics")
 		return errors.Wrapf(err, "unable to get available host for %q", ctx)
@@ -248,6 +248,7 @@ func getDiskSpecs(dataStore *basetypv1.Storage,
 	for _, disk := range devices {
 		disk.Volume.DataStoreID = dataStore.ID
 		disk.Volume.DataStoreName = dataStore.Name
+		disk.Volume.Format= "RAW"
 		disks = append(disks, disk)
 	}
 
@@ -267,6 +268,7 @@ func getNetworkSpecs(ctx *context.VMContext, devices []basetypv1.Nic,
 			netSpec.DeviceID = network.ID
 			netSpec.DeviceName = network.Name
 			netSpec.NetworkID = network.ID
+			netSpec.VswitchID = network.VswitchDto.ID
 
 			deviceSpec := &ctx.ICSVM.Spec.Network.Devices[index]
 
@@ -275,6 +277,7 @@ func getNetworkSpecs(ctx *context.VMContext, devices []basetypv1.Nic,
 			isStatic := true
 			if deviceSpec.DHCP4 || deviceSpec.DHCP6 {
 				isStatic = false
+				netSpec.Dhcp = true
 			}
 			if isStatic {
 				ip, netmask, err := infrautilv1.GetIPFromNetworkConfig(ctx, deviceSpec)
@@ -297,7 +300,7 @@ func getNetworkSpecs(ctx *context.VMContext, devices []basetypv1.Nic,
 	return deviceSpecs, nil
 }
 
-func getAvailableHosts(ctx *context.VMContext, cluster basetypv1.Cluster,
+func getAvailableHosts(ctx *context.VMContext,
 	dataStore basetypv1.Storage, networks map[int]basetypv1.Network) (basetypv1.Host, error) {
 	var (
 		host              = basetypv1.Host{}
@@ -307,10 +310,11 @@ func getAvailableHosts(ctx *context.VMContext, cluster basetypv1.Cluster,
 	)
 
 	hostService := basehstv1.NewHostService(ctx.Session.Client)
-	clusterHosts, err := hostService.GetHostListByClusterID(ctx, cluster.Id)
+	hosts, err := hostService.GetHostList(ctx)
 	if err != nil {
 		return basetypv1.Host{}, err
 	}
+	klog.Infof("DavidWang# GetHostList hosts: %+v", hosts)
 
 	storageHosts, err := hostService.GetHostListByStorageID(ctx, dataStore.ID)
 	if err != nil {
@@ -321,6 +325,7 @@ func getAvailableHosts(ctx *context.VMContext, cluster basetypv1.Cluster,
 			storageHostsIndex[host.ID] = host.Name
 		}
 	}
+	klog.Infof("DavidWang# GetHostListByStorageID dataStore[%s] storageHosts: %+v", dataStore.ID, storageHosts)
 
 	hostBounds := make(map[string]int)
 	for _, network := range networks {
@@ -333,6 +338,7 @@ func getAvailableHosts(ctx *context.VMContext, cluster basetypv1.Cluster,
 				hostBounds[host.ID]++
 			}
 		}
+		klog.Infof("DavidWang# GetHostListByNetworkID network[%s] networkHosts: %+v", network.ID, networkHosts)
 	}
 	totalBounds := len(networks)
 	for hostID, bounds := range hostBounds {
@@ -341,12 +347,12 @@ func getAvailableHosts(ctx *context.VMContext, cluster basetypv1.Cluster,
 		}
 	}
 
-	for _, host := range clusterHosts {
+	for _, host := range hosts {
 		if host.ID != "" && host.Status == "CONNECTED" {
 			_, storageOK := storageHostsIndex[host.ID]
 			_, networkOK := networkHostsIndex[host.ID]
 			if storageOK && networkOK {
-				availableHosts = append(availableHosts, *host)
+				availableHosts = append(availableHosts, host)
 			}
 		}
 	}
@@ -354,5 +360,6 @@ func getAvailableHosts(ctx *context.VMContext, cluster basetypv1.Cluster,
 		index := rand.Intn(len(availableHosts))
 		host = availableHosts[index]
 	}
+	klog.Infof("DavidWang# availableHosts host: %+v", host)
 	return host, nil
 }

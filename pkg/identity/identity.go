@@ -63,7 +63,7 @@ func IsSecretIdentity(cluster *infrav1.ICSCluster) bool {
 }
 
 
-func ValidateMachineInputs(c client.Client, vm *infrav1.ICSMachine) error {
+func ValidateMachineInputs(c client.Client, vm *infrav1.ICSVM) error {
 	if c == nil {
 		return errors.New("kubernetes client is required")
 	}
@@ -77,21 +77,21 @@ func ValidateMachineInputs(c client.Client, vm *infrav1.ICSMachine) error {
 	return nil
 }
 
-func IsMachineSecretIdentity(spec *infrav1.ICSMachineSpec) bool {
-	if spec == nil || spec.IdentityRef == nil {
+func IsMachineSecretIdentity(identityRef *infrav1.ICSIdentityReference) bool {
+	if identityRef == nil {
 		return false
 	}
 
-	return spec.IdentityRef.Kind == infrav1.SecretKind
+	return identityRef.Kind == infrav1.SecretKind
 }
 
-func NewClientFromMachine(ctx context.Context, ctrlClient client.Client, nameSpace string, spec *infrav1.ICSMachineSpec) (*basev1.ICenter, error) {
+func NewClientFromMachine(ctx context.Context, ctrlClient client.Client, nameSpace string, cloudName string, identityRef *infrav1.ICSIdentityReference) (*basev1.ICenter, error) {
 	var iCenter basev1.ICenter
 	var caCert []byte
 
-	if spec.IdentityRef != nil {
+	if identityRef != nil {
 		var err error
-		iCenter, caCert, err = getCloudFromSecret(ctx, ctrlClient, nameSpace, spec.IdentityRef.Name, spec.CloudName)
+		iCenter, caCert, err = getCloudFromSecret(ctx, ctrlClient, nameSpace, identityRef.Name, cloudName)
 		if err != nil {
 			return nil, err
 		}

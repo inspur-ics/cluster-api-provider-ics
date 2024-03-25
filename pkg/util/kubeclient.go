@@ -31,10 +31,7 @@ import (
 
 // NewKubeClient returns a new client for the target cluster using the KubeConfig
 // secret stored in the management cluster.
-func NewKubeClient(
-	ctx context.Context,
-	controllerClient client.Client,
-	cluster *clusterv1.Cluster) (kubernetes.Interface, error) {
+func NewKubeClient(ctx context.Context, controllerClient client.Client, cluster *clusterv1.Cluster) (kubernetes.Interface, error) {
 	clusterKey := client.ObjectKey{Namespace: cluster.Namespace, Name: cluster.Name}
 	kubeconfig, err := kcfg.FromSecret(ctx, controllerClient, clusterKey)
 	if err != nil {

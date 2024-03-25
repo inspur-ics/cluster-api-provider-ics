@@ -95,12 +95,12 @@ func (r *ICSMachine) ValidateUpdate(old runtime.Object) error {
 		delete(newICSMachineSpec, "providerID")
 	}
 
-	newVSphereMachineNetwork := newICSMachineSpec["network"].(map[string]interface{})
-	oldVSphereMachineNetwork := oldICSMachineSpec["network"].(map[string]interface{})
+	newICSMachineNetwork := newICSMachineSpec["network"].(map[string]interface{})
+	oldICSMachineNetwork := oldICSMachineSpec["network"].(map[string]interface{})
 
 	// allow changes to the devices..
-	delete(oldVSphereMachineNetwork, "devices")
-	delete(newVSphereMachineNetwork, "devices")
+	delete(oldICSMachineNetwork, "devices")
+	delete(newICSMachineNetwork, "devices")
 
 	// validate that IPAddrs in updaterequest are valid.
 	spec := r.Spec

@@ -48,6 +48,9 @@ type ICSIdentityReference struct {
 	// Name of the identity.
 	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
+
+	// +optional
+	IdentityKey *string `json:"identityKey,omitempty"`
 }
 
 // VirtualMachineCloneSpec is information used to clone a virtual machine.

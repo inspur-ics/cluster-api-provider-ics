@@ -48,7 +48,8 @@ func newICSCluster() infrav1.ICSCluster {
 				Name: fmt.Sprintf("%s-cloud-config", env.ClusterNameVar),
 				Kind: infrav1.SecretKind,
 			},
-			Insecure:        &isSecure,
+			Insecure:            &isSecure,
+			EnabledLoadBalancer: false,
 		},
 	}
 }
@@ -70,7 +71,8 @@ func newICSClusterWithLoadBalancer() infrav1.ICSCluster {
 				Name: fmt.Sprintf("%s-cloud-config", env.ClusterNameVar),
 				Kind: infrav1.SecretKind,
 			},
-			Insecure:        &isSecure,
+			Insecure:            &isSecure,
+			EnabledLoadBalancer: true,
 			ControlPlaneEndpoint: clusterv1.APIEndpoint{
 				Host: env.ControlPlaneEndpointVar,
 				Port: 6443,
@@ -263,13 +265,13 @@ func newIdentitySecret() corev1.Secret {
 			APIVersion: corev1.SchemeGroupVersion.String(),
 			Kind:       util.TypeToKind(&corev1.Secret{}),
 		},
-		ObjectMeta: metav1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta {
 			Namespace: env.NamespaceVar,
 			Name:      fmt.Sprintf("%s-cloud-config", env.ClusterNameVar),
 		},
-		StringData: map[string]string{
-			identity.CloudsSecretKey: env.ICSServerConfig,
-			identity.CaSecretKey: env.ICSServerCa,
+		Data: map[string][]byte {
+			identity.CloudsSecretKey: []byte(""),
+			identity.CaSecretKey: []byte(""),
 		},
 	}
 }
@@ -320,7 +322,7 @@ func newKubeadmControlplane(replicas int, infraTemplate infrav1.ICSMachineTempla
 			Kind:       util.TypeToKind(&controlplanev1.KubeadmControlPlane{}),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      env.ClusterNameVar,
+			Name:      fmt.Sprintf("%s-control-plane", env.ClusterNameVar),
 			Namespace: env.NamespaceVar,
 		},
 		Spec: controlplanev1.KubeadmControlPlaneSpec{

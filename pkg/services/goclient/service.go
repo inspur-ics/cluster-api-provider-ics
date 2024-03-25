@@ -71,10 +71,15 @@ func (vms *VMService) ReconcileVM(ctx *context.VMContext) (vm infrav1.VirtualMac
 		if err != nil {
 			return vm, err
 		}
+		metadataBytes, err := base64.StdEncoding.DecodeString(metadata)
+		if err != nil {
+			ctx.Logger.Error(err, "fail to decode bootstrap data")
+			return vm, err
+		}
 
 		// Otherwise, this is a new machine and the  the VM should be created.
 		// Create the VM.
-		return vm, basev1.CreateVM(ctx, metadata)
+		return vm, basev1.CreateVM(ctx, string(metadataBytes))
 	}
 
 	//
@@ -168,7 +173,7 @@ func (vms *VMService) DestroyVM(ctx *context.VMContext) (infrav1.VirtualMachine,
 
 	// At this point the VM is not powered on and can be destroyed. Store the
 	// destroy task's reference and return a requeue error.
-	task, err := vmCtx.Obj.DeleteVM(ctx, vmRef.Value, true, true)
+	task, err := vmCtx.Obj.DeleteVMWithCheckParams(ctx, vmRef.Value, true, true, ctx.Session.Password)
 	if err != nil {
 		ctx.Logger.Error(err, "fail to destroying vm")
 		return vm, err
@@ -259,7 +264,7 @@ func (vms *VMService) reconcileCloudInit(ctx *virtualMachineContext) (bool, erro
 		return false, errors.Errorf("get vm %s info err", ctx.Ref.Value)
 	}
 
-	if vmObj != nil && len(vmObj.ExtendData) > 0 {
+	if vmObj != nil && len(vmObj.CloudInit.UserData) > 0 {
 		return true, nil
 	}
 

@@ -91,6 +91,18 @@ var (
 			Value:     env.DefaultNumCPUs,
 			FieldPath: []string{"spec", "template", "spec", "numCPUs"},
 		},
+		{
+			Kind:      "Secret",
+			Name:      "${CLUSTER_NAME}-cloud-config",
+			Value:     env.ICSServerConfig,
+			FieldPath: []string{"data", "clouds.yaml"},
+		},
+		{
+			Kind:      "Secret",
+			Name:      "${CLUSTER_NAME}-cloud-config",
+			Value:     env.ICSServerCa,
+			FieldPath: []string{"data", "cacert"},
+		},
 	}
 
 	stringVars = []string{

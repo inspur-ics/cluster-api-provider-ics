@@ -34,7 +34,7 @@ import (
 	infrav1 "github.com/inspur-ics/cluster-api-provider-ics/api/v1beta1"
 )
 
-// GetMachinesInCluster gets a cluster's Machine resources.
+// GetMachinesInCluster gets a cluster's Machine resources. I6_spur!
 func GetMachinesInCluster(
 	ctx context.Context,
 	controllerClient client.Client,
@@ -63,6 +63,30 @@ func GetMachinesInCluster(
 func GetICSMachinesInCluster(ctx context.Context, controllerClient client.Client,
 	namespace, clusterName string) ([]*infrav1.ICSMachine, error) {
 	labels := map[string]string{clusterv1.ClusterLabelName: clusterName}
+	machineList := &infrav1.ICSMachineList{}
+
+	if err := controllerClient.List(
+		ctx, machineList,
+		client.InNamespace(namespace),
+		client.MatchingLabels(labels)); err != nil {
+		return nil, err
+	}
+
+	machines := make([]*infrav1.ICSMachine, len(machineList.Items))
+	for i := range machineList.Items {
+		machines[i] = &machineList.Items[i]
+	}
+
+	return machines, nil
+}
+
+// GetControlPlaneICSMachinesInCluster gets a cluster's ICSMachine resources.
+func GetControlPlaneICSMachinesInCluster(ctx context.Context, controllerClient client.Client,
+	namespace, clusterName string) ([]*infrav1.ICSMachine, error) {
+	labels := map[string]string{
+		clusterv1.ClusterLabelName: clusterName,
+		clusterv1.MachineControlPlaneLabelName: "",
+	}
 	machineList := &infrav1.ICSMachineList{}
 
 	if err := controllerClient.List(
@@ -199,6 +223,28 @@ func GetOwnerICSMachine(ctx context.Context, c client.Client, obj metav1.ObjectM
 
 func GetICSMachineByName(ctx context.Context, c client.Client, namespace, name string) (*infrav1.ICSMachine, error) {
 	m := &infrav1.ICSMachine{}
+	key := client.ObjectKey{Name: name, Namespace: namespace}
+	if err := c.Get(ctx, key, m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func GetOwnerMachine(ctx context.Context, c client.Client, obj metav1.ObjectMeta) (*clusterv1.Machine, error) {
+	for _, ref := range obj.OwnerReferences {
+		gv, err := schema.ParseGroupVersion(ref.APIVersion)
+		if err != nil {
+			return nil, err
+		}
+		if ref.Kind == "Machine" && gv.Group == clusterv1.GroupVersion.Group {
+			return GetMachineByName(ctx, c, obj.Namespace, ref.Name)
+		}
+	}
+	return nil, nil
+}
+
+func GetMachineByName(ctx context.Context, c client.Client, namespace, name string) (*clusterv1.Machine, error) {
+	m := &clusterv1.Machine{}
 	key := client.ObjectKey{Name: name, Namespace: namespace}
 	if err := c.Get(ctx, key, m); err != nil {
 		return nil, err

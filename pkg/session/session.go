@@ -71,15 +71,22 @@ func DefaultFeature() Feature {
 }
 
 type Params struct {
+	cloudName  string
 	server     string
 	userinfo   *url.Userinfo
 	feature    Feature
+	version    string
 }
 
 func NewParams() *Params {
 	return &Params{
 		feature: DefaultFeature(),
 	}
+}
+
+func (p *Params) WithCloudName(cloudName string) *Params {
+	p.cloudName = cloudName
+	return p
 }
 
 func (p *Params) WithServer(server string) *Params {
@@ -89,6 +96,11 @@ func (p *Params) WithServer(server string) *Params {
 
 func (p *Params) WithUserInfo(username, password string) *Params {
 	p.userinfo = url.UserPassword(username, password)
+	return p
+}
+
+func (p *Params) WithAPIVersion(apiVersion string) *Params {
+	p.version = apiVersion
 	return p
 }
 
@@ -102,10 +114,10 @@ func (p *Params) WithFeatures(feature Feature) *Params {
 func GetOrCreate(ctx context.Context, params *Params) (*Session, error) {
 	logger := ctrl.LoggerFrom(ctx).WithName("session")
 
-	sessionKey := params.server + params.userinfo.Username()
+	sessionKey := params.cloudName
 	if cachedSession, ok := sessionCache.Load(sessionKey); ok {
 		s := cachedSession.(*Session)
-		logger = logger.WithValues("server", params.server)
+		logger = logger.WithValues("server", params.cloudName)
 
 		vimSessionActive, err := s.SessionIsActive(ctx, logger)
 		if err != nil {
@@ -128,18 +140,40 @@ func GetOrCreate(ctx context.Context, params *Params) (*Session, error) {
 	}
 
 	icenterURL.User = params.userinfo
-	client, err := newClient(ctx, logger, sessionKey, icenterURL, params.feature)
+	client, err := newClient(ctx, logger, icenterURL)
 	if err != nil {
 		return nil, err
 	}
+	client.Client.Version = "6.12.0"
 
 	session := Session{client}
 	// Cache the session.
 	sessionCache.Store(sessionKey, &session)
 
-	logger.V(2).Info("cached ICS client session", "server", params.server)
+	logger.V(2).Info("cached ICS client session", "server", params.cloudName)
 
 	return &session, nil
+}
+
+// Gets a cached session, already exist.
+func Get(ctx context.Context, sessionKey string) (*Session, error) {
+	logger := ctrl.LoggerFrom(ctx).WithName("session")
+
+	if cachedSession, ok := sessionCache.Load(sessionKey); ok {
+		s := cachedSession.(*Session)
+		logger = logger.WithValues("SessionKey", sessionKey)
+
+		vimSessionActive, err := s.SessionIsActive(ctx, logger)
+		if err != nil {
+			logger.Error(err, "unable to check if vim session is active")
+		}
+
+		if vimSessionActive {
+			logger.V(2).Info("found active cached ICS client session")
+			return s, nil
+		}
+	}
+	return nil, errors.Errorf("error found active cached ICS client session for key %s", sessionKey)
 }
 
 // ParseURL is wrapper around url.Parse, where Scheme defaults to "https"
@@ -166,12 +200,12 @@ func parseURL(s string) (*url.URL, error) {
 	return u, nil
 }
 
-func newClient(ctx context.Context, logger logr.Logger, sessionKey string, url *url.URL, feature Feature) (*basegov1.ICSConnection, error) {
-	password, _ := url.User.Password();
+func newClient(ctx context.Context, logger logr.Logger, url *url.URL,) (*basegov1.ICSConnection, error) {
+	password, _ := url.User.Password()
 	c := &basegov1.ICSConnection{
 		Username: url.User.Username(),
 		Password: password,
-		Hostname: url.Host,
+		Hostname: url.Hostname(),
 		Insecure: true,
 		Port:     url.Port(),
 	}
@@ -207,12 +241,9 @@ func (s *Session) GetVersion() (infrav1.ICenterVersion, error) {
 	if err != nil {
 		return "", err
 	}
-
-	switch version.Major {
-	case 5:
-		return infrav1.NewICenterVersion(svcVersion), nil
-	default:
-		return "", unidentifiedICenterVersion{version: svcVersion}
+	miniVersion, _ := semver.Make("6.12.0")
+	if version.Compare(miniVersion) <= -1 {
+		return "", unidentifiedICenterVersion{version: s.Client.Version}
 	}
-	return "", unidentifiedICenterVersion{version: "5.8"}
+	return infrav1.NewICenterVersion(svcVersion), nil
 }

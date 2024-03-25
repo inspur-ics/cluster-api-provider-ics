@@ -120,10 +120,15 @@ spec:
                 - host
                 - port
                 type: object
+              enabledLoadBalancer:
+                description: Enabled defines whether a LoadBalancer should be created.
+                type: boolean
               identityRef:
                 description: IdentityRef is a reference to either a Secret that contains
                   the identity to use when reconciling the cluster.
                 properties:
+                  identityKey:
+                    type: string
                   kind:
                     description: Kind of the identity. Can either be Secret
                     enum:
@@ -284,10 +289,15 @@ spec:
                 - host
                 - port
                 type: object
+              enabledLoadBalancer:
+                description: Enabled defines whether a LoadBalancer should be created.
+                type: boolean
               identityRef:
                 description: IdentityRef is a reference to either a Secret that contains
                   the identity to use when reconciling the cluster.
                 properties:
+                  identityKey:
+                    type: string
                   kind:
                     description: Kind of the identity. Can either be Secret
                     enum:
@@ -456,6 +466,8 @@ spec:
                 description: IdentityRef is a reference to either a Secret that contains
                   the identity to use when reconciling the cluster.
                 properties:
+                  identityKey:
+                    type: string
                   kind:
                     description: Kind of the identity. Can either be Secret
                     enum:
@@ -815,6 +827,8 @@ spec:
                 description: IdentityRef is a reference to either a Secret that contains
                   the identity to use when reconciling the cluster.
                 properties:
+                  identityKey:
+                    type: string
                   kind:
                     description: Kind of the identity. Can either be Secret
                     enum:
@@ -1223,6 +1237,8 @@ spec:
                         description: IdentityRef is a reference to either a Secret
                           that contains the identity to use when reconciling the cluster.
                         properties:
+                          identityKey:
+                            type: string
                           kind:
                             description: Kind of the identity. Can either be Secret
                             enum:
@@ -1478,6 +1494,8 @@ spec:
                         description: IdentityRef is a reference to either a Secret
                           that contains the identity to use when reconciling the cluster.
                         properties:
+                          identityKey:
+                            type: string
                           kind:
                             description: Kind of the identity. Can either be Secret
                             enum:
@@ -1811,6 +1829,8 @@ spec:
                 description: IdentityRef is a reference to either a Secret that contains
                   the identity to use when reconciling the cluster.
                 properties:
+                  identityKey:
+                    type: string
                   kind:
                     description: Kind of the identity. Can either be Secret
                     enum:
@@ -2224,6 +2244,8 @@ spec:
                 description: IdentityRef is a reference to either a Secret that contains
                   the identity to use when reconciling the cluster.
                 properties:
+                  identityKey:
+                    type: string
                   kind:
                     description: Kind of the identity. Can either be Secret
                     enum:

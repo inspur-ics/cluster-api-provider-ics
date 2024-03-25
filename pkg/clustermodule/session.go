@@ -33,15 +33,17 @@ import (
 
 func fetchSessionForObject(ctx *context.ClusterContext, template *infrav1.ICSMachineTemplate) (*session.Session, error) {
 	params := newParams(*ctx)
-	iCenter, err := identity.NewClientFromMachine(ctx, ctx.Client, template.Namespace, &template.Spec.Template.Spec)
+	iCenter, err := identity.NewClientFromMachine(ctx, ctx.Client, template.Namespace, template.Spec.Template.Spec.CloudName, template.Spec.Template.Spec.IdentityRef)
 	if err != nil {
 		return nil, err
 	}
 
-	params.
+	params.WithCloudName(template.Spec.Template.Spec.CloudName).
 		WithServer(iCenter.ICenterURL).
-		WithUserInfo(iCenter.AuthInfo.Username, iCenter.AuthInfo.Password)
-	return session.GetOrCreate(ctx, params)
+		WithUserInfo(iCenter.AuthInfo.Username, iCenter.AuthInfo.Password).
+		WithAPIVersion(iCenter.APIVersion)
+	session, err := session.GetOrCreate(ctx, params)
+	return session, err
 }
 
 func newParams(ctx context.ClusterContext) *session.Params {
@@ -58,9 +60,12 @@ func fetchSession(ctx *context.ClusterContext) (*session.Session, error) {
 	}
 
 	params := session.NewParams().
+		WithCloudName(ctx.ICSCluster.Spec.CloudName).
 		WithServer(iCenter.ICenterURL).
-		WithUserInfo(iCenter.AuthInfo.Username, iCenter.AuthInfo.Password)
-	return session.GetOrCreate(ctx, params)
+		WithUserInfo(iCenter.AuthInfo.Username, iCenter.AuthInfo.Password).
+		WithAPIVersion(iCenter.APIVersion)
+	session, err := session.GetOrCreate(ctx, params)
+	return session, err
 }
 
 func fetchTemplateRef(ctx goctx.Context, c client.Client, input Wrapper) (*corev1.ObjectReference, error) {

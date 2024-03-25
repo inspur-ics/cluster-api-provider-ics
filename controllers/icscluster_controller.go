@@ -24,12 +24,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	clusterutilv1 "sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/annotations"
@@ -52,7 +54,6 @@ import (
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/record"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/session"
 	infrautilv1 "github.com/inspur-ics/cluster-api-provider-ics/pkg/util"
-	"github.com/pkg/errors"
 )
 
 var (
@@ -63,7 +64,7 @@ var (
 // +kubebuilder:rbac:groups=core,resources=namespaces,verbs=get;list;watch
 // +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=icsclusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=icsclusters/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters;clusters/status,verbs=get;list;watch
+// +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters;clusters/status,verbs=get;list;watch;update;patch
 
 // AddClusterControllerToManager adds the cluster controller to the provided
 // manager.
@@ -282,6 +283,16 @@ func (r clusterReconciler) reconcileNormal(ctx *context.ClusterContext) (reconci
 		ctx.Logger.Error(err, "could not reconcile iCenter version")
 	}
 
+	// Reconcile the ICSCluster's load balancer.
+	if ok, err := r.reconcileLoadBalancer(ctx); !ok {
+		if err != nil {
+			return reconcile.Result{}, errors.Wrapf(err,
+				"unexpected error while reconciling load balancer for %s", ctx)
+		}
+		ctx.Logger.Info("load balancer is not reconciled")
+		return reconcile.Result{}, nil
+	}
+
 	ctx.ICSCluster.Status.Ready = true
 
 	// Reconcile the ICSCluster resource's control plane endpoint.
@@ -290,6 +301,15 @@ func (r clusterReconciler) reconcileNormal(ctx *context.ClusterContext) (reconci
 			return reconcile.Result{}, errors.Wrapf(err,
 				"unexpected error while reconciling control plane endpoint for %s", ctx)
 		}
+		ctx.Logger.Info("control plane endpoint is not reconciled")
+		return reconcile.Result{RequeueAfter: 10 * time.Second}, nil
+	}
+
+	// Ensure the ICSCluster is reconciled when the API server first comes online.
+	// A reconcile event will only be triggered if the Cluster is not marked as
+	// ControlPlaneInitialized.
+	r.reconcileICSClusterWhenAPIServerIsOnline(ctx)
+	if ctx.ICSCluster.Spec.ControlPlaneEndpoint.IsZero() {
 		ctx.Logger.Info("control plane endpoint is not reconciled")
 		return reconcile.Result{}, nil
 	}
@@ -304,6 +324,9 @@ func (r clusterReconciler) reconcileNormal(ctx *context.ClusterContext) (reconci
 		return reconcile.Result{}, nil
 	}
 
+	// Sync Custom kubeconfig
+	r.syncCustomKubeConfig(ctx)
+
 	return reconcile.Result{}, nil
 }
 
@@ -317,6 +340,9 @@ func (r clusterReconciler) reconcileIdentitySecret(ctx *context.ClusterContext) 
 		}
 		err := ctx.Client.Get(ctx, secretKey, secret)
 		if err != nil {
+			if infrautilv1.IsNotFoundError(err) {
+				return nil
+			}
 			return err
 		}
 	}
@@ -331,12 +357,18 @@ func (r clusterReconciler) reconcileICenterConnectivity(ctx *context.ClusterCont
 
 	iCenter, err := identity.NewClientFromCluster(ctx, r.Client, ctx.ICSCluster)
 	if err != nil {
+		if infrautilv1.IsNotFoundError(err) {
+			sessionKey := ctx.ICSCluster.Spec.CloudName
+			return session.Get(ctx, sessionKey)
+		}
 		return nil, err
 	}
 
 	params := session.NewParams().
+		WithCloudName(ctx.ICSCluster.Spec.CloudName).
 		WithServer(iCenter.ICenterURL).
 		WithUserInfo(iCenter.AuthInfo.Username, iCenter.AuthInfo.Password).
+		WithAPIVersion(iCenter.APIVersion).
 		WithFeatures(session.Feature{
 			KeepAliveDuration: r.KeepAliveDuration,
 		})
@@ -352,63 +384,97 @@ func (r clusterReconciler) reconcileICenterVersion(ctx *context.ClusterContext, 
 	return nil
 }
 
-func (r clusterReconciler) reconcileControlPlaneEndpoint(ctx *context.ClusterContext) (bool, error) {
-	// Ensure the ICSCluster is reconciled when the API server first comes online.
-	// A reconcile event will only be triggered if the Cluster is not marked as
-	// ControlPlaneInitialized.
-	defer r.reconcileICSClusterWhenAPIServerIsOnline(ctx)
-
-	// If the cluster already has a control plane endpoint set then there
-	// is nothing to do.
+func (r clusterReconciler) reconcileLoadBalancer(ctx *context.ClusterContext) (bool, error) {
 	if !ctx.Cluster.Spec.ControlPlaneEndpoint.IsZero() {
 		ctx.ICSCluster.Spec.ControlPlaneEndpoint.Host = ctx.Cluster.Spec.ControlPlaneEndpoint.Host
 		ctx.ICSCluster.Spec.ControlPlaneEndpoint.Port = ctx.Cluster.Spec.ControlPlaneEndpoint.Port
-		ctx.Logger.Info("skipping control plane endpoint reconciliation",
-			"reason", "ControlPlaneEndpoint already set on Cluster",
-			"controlPlaneEndpoint", ctx.Cluster.Spec.ControlPlaneEndpoint.String())
-		return true, nil
 	}
 
-	if !ctx.ICSCluster.Spec.ControlPlaneEndpoint.IsZero() {
-		ctx.Logger.Info("skipping control plane endpoint reconciliation",
-			"reason", "ControlPlaneEndpoint already set on ICSCluster",
-			"controlPlaneEndpoint", ctx.ICSCluster.Spec.ControlPlaneEndpoint.String())
-		return true, nil
+	if ctx.ICSCluster.Spec.ControlPlaneEndpoint.IsZero() {
+		ctx.ICSCluster.Spec.ControlPlaneEndpoint.Host = "127.0.0.1"
+		ctx.ICSCluster.Spec.EnabledLoadBalancer = false
+	} else if ctx.ICSCluster.Spec.ControlPlaneEndpoint.Host != "127.0.0.1" {
+		ctx.ICSCluster.Spec.EnabledLoadBalancer = true
 	}
 
-	// Get the CAPI Machine resources for the cluster.
-	machines, err := infrautilv1.GetMachinesInCluster(ctx, ctx.Client, ctx.ICSCluster.Namespace, ctx.ICSCluster.Name)
-	if err != nil {
-		return false, errors.Wrapf(err,
-			"failed to get Machinces for Cluster %s/%s",
+	// Update the ICSCluster.Spec.ControlPlaneEndpoint with the address
+	// from the load balancer.
+	// The control plane endpoint also requires a port, which is obtained
+	// either from the ICSCluster.Spec.ControlPlaneEndpoint.Port
+	// or the default port is used.
+	if ctx.ICSCluster.Spec.ControlPlaneEndpoint.Port == 0 {
+		ctx.ICSCluster.Spec.ControlPlaneEndpoint.Port = defaultAPIEndpointPort
+	}
+	ctx.Logger.Info("ControlPlaneEndpoint discovered via load balancer",
+		"controlPlaneEndpoint", ctx.ICSCluster.Spec.ControlPlaneEndpoint.String())
+
+	return true, nil
+}
+
+
+func (r clusterReconciler) reconcileControlPlaneEndpoint(ctx *context.ClusterContext) (bool, error) {
+	ctx.Logger.Info("Reconciling control plane endpoint")
+	if ctx.ICSCluster.Spec.EnabledLoadBalancer {
+		if !ctx.Cluster.Spec.ControlPlaneEndpoint.IsZero() {
+			ctx.ICSCluster.Spec.ControlPlaneEndpoint.Host = ctx.Cluster.Spec.ControlPlaneEndpoint.Host
+			ctx.ICSCluster.Spec.ControlPlaneEndpoint.Port = ctx.Cluster.Spec.ControlPlaneEndpoint.Port
+			conditions.MarkTrue(ctx.ICSCluster, infrav1.LoadBalancerReadyCondition)
+			ctx.Logger.Info("skipping control plane endpoint reconciliation",
+				"reason", "ControlPlaneEndpoint already set on Cluster",
+				"controlPlaneEndpoint", ctx.Cluster.Spec.ControlPlaneEndpoint.String())
+			return true, nil
+		}
+
+		if !ctx.ICSCluster.Spec.ControlPlaneEndpoint.IsZero() {
+			conditions.MarkTrue(ctx.ICSCluster, infrav1.LoadBalancerReadyCondition)
+			ctx.Logger.Info("skipping control plane endpoint reconciliation",
+				"reason", "ControlPlaneEndpoint already set on icsCluster",
+				"controlPlaneEndpoint", ctx.ICSCluster.Spec.ControlPlaneEndpoint.String())
+			return true, nil
+		}
+
+		return false, errors.Wrapf(errors.New("no load-balanced control plane endpoint"),
+			"failed to reconcile loadbalanced endpoint for icsCluster %s/%s",
 			ctx.ICSCluster.Namespace, ctx.ICSCluster.Name)
 	}
 
+	icsMachines, err := infrautilv1.GetControlPlaneICSMachinesInCluster(ctx, ctx.Client, ctx.Cluster.Namespace, ctx.Cluster.Name)
+	//machines, err := collections.GetFilteredMachinesForCluster(ctx, r.Client, ctx.Cluster, collections.ControlPlaneMachines(ctx.Cluster.Name))
+	if err != nil {
+		if infrautilv1.IsNotFoundError(err) || len(icsMachines) == 0 {
+			return false, nil
+		}
+		return false, errors.Wrapf(err,
+			"failed to get ICSMachines for Cluster %s/%s",
+			ctx.ICSCluster.Namespace, ctx.ICSCluster.Name)
+	}
+	// Define a variable to assign the API endpoints of control plane
+	// machines as they are discovered.
+	var apiEndpointList []clusterv1.APIEndpoint //nolint:prealloc
+
 	// Iterate over the cluster's control plane CAPI machines.
-	for _, machine := range machines {
-		if !clusterutilv1.IsControlPlaneMachine(machine) {
-			continue
+	for _, icsMachine := range icsMachines {
+		// Get the ICSMachine for the CAPI Machine resource.
+		machine, err := infrautilv1.GetOwnerMachine(ctx, ctx.Client, icsMachine.ObjectMeta)
+		if err != nil {
+			if infrautilv1.IsNotFoundError(err) {
+				continue
+			}
+			return false, errors.Wrapf(err,
+				"failed to get Machine for icsMachine %s/%s/%s",
+				ctx.ICSCluster.Namespace, ctx.ICSCluster.Name, icsMachine.Name)
 		}
 
 		// Only machines with bootstrap data will have an IP address.
-		if machine.Spec.Bootstrap.DataSecretName == nil {
-			ctx.Logger.V(4).Info(
-				"skipping machine while looking for IP address",
-				"machine-name", machine.Name,
-				"skip-reason", "nilBootstrapData")
+		if machine == nil || machine.Spec.Bootstrap.DataSecretName == nil {
+			if machine != nil {
+				ctx.Logger.V(5).Info(
+					"skipping machine while looking for IP address",
+					"reason", "bootstrap.DataSecretName is nil",
+					"machine-name", machine.Name)
+			}
 			continue
 		}
-
-		// Get the ICSMachine for the CAPI Machine resource.
-		icsMachine, err := infrautilv1.GetICSMachineByName(ctx, ctx.Client, machine.Namespace, machine.Name)
-		if err != nil {
-			return false, errors.Wrapf(err,
-				"failed to get ICSMachine for Machine %s/%s/%s",
-				machine.GroupVersionKind(),
-				machine.Namespace,
-				machine.Name)
-		}
-
 		// Get the ICSMachine's preferred IP address.
 		ipAddr, err := infrautilv1.GetMachinePreferredIPAddress(icsMachine)
 		if err != nil {
@@ -421,23 +487,78 @@ func (r clusterReconciler) reconcileControlPlaneEndpoint(ctx *context.ClusterCon
 				icsMachine.Namespace,
 				icsMachine.Name)
 		}
-
-		// Set the ControlPlaneEndpoint so the CAPI controller can read the
-		// value into the analogous CAPI Cluster using an UnstructuredReader.
+		// Append the control plane machine's IP address to the list of API
+		// endpoints for this cluster so that they can be read into the
+		// analogous CAPI cluster via an unstructured reader.
 		apiEndpoint := clusterv1.APIEndpoint{
 			Host: ipAddr,
 			Port: defaultAPIEndpointPort,
 		}
-		//ctx.ICSCluster.Spec.ControlPlaneEndpoint.Host = ipAddr
-		//ctx.ICSCluster.Spec.ControlPlaneEndpoint.Port = defaultAPIEndpointPort
-		ctx.ICSCluster.Spec.ControlPlaneEndpoint = apiEndpoint
-		ctx.Logger.Info(
-			"ControlPlaneEndpoin discovered via control plane machine",
-			"controlPlaneEndpoint", ctx.ICSCluster.Spec.ControlPlaneEndpoint)
-		return true, nil
+		apiEndpointList = append(apiEndpointList, apiEndpoint)
+		ctx.Logger.V(3).Info(
+			"found API endpoint via control plane machine",
+			"host", apiEndpoint.Host,
+			"port", apiEndpoint.Port)
 	}
 
-	return false, errors.Errorf("unable to determine control plane endpoint for %s", ctx)
+	// The reconciliation is only successful if some API endpoints were
+	// discovered. Otherwise return an error so the cluster is requeued
+	// for reconciliation.
+	if len(apiEndpointList) == 0 {
+		return false, errors.Wrapf(err,
+			"failed to reconcile API endpoints for %s/%s",
+			ctx.ICSCluster.Namespace, ctx.ICSCluster.Name)
+	}
+
+	// Update the icsCluster's list of APIEndpoints.
+	ctx.ICSCluster.Spec.ControlPlaneEndpoint = apiEndpointList[0]
+
+	cluster := &clusterv1.Cluster{}
+	clusterKey := client.ObjectKey{Namespace: ctx.Cluster.Namespace, Name: ctx.Cluster.Name}
+	if err := ctx.Client.Get(ctx, clusterKey, cluster); err != nil {
+		ctx.Logger.Error(err, "failed to get cluster object while reconciling api endpoint")
+		return false, nil
+	}
+	if ctx.ICSCluster.Spec.ControlPlaneEndpoint.Host != cluster.Spec.ControlPlaneEndpoint.Host ||
+		ctx.ICSCluster.Spec.ControlPlaneEndpoint.Port != cluster.Spec.ControlPlaneEndpoint.Port {
+		// Create the patch helper.
+		patchHelper, err := patch.NewHelper(cluster, r.Client)
+		if err != nil {
+			return false, errors.Wrapf(err,"failed to init patch helper for the cluster object")
+		}
+		cluster.Spec.ControlPlaneEndpoint = *ctx.ICSCluster.Spec.ControlPlaneEndpoint.DeepCopy()
+		err = patchHelper.Patch(ctx, cluster)
+		if err != nil {
+			return false, errors.Wrapf(err,"failed to patch the cluster object")
+		}
+		apiServer := fmt.Sprintf("https://%s:%d", ctx.ICSCluster.Spec.ControlPlaneEndpoint.Host,
+			ctx.ICSCluster.Spec.ControlPlaneEndpoint.Port)
+		secret := &corev1.Secret{}
+		secretKey := apitypes.NamespacedName{
+			Namespace: ctx.ICSCluster.Namespace,
+			Name:      ctx.ICSCluster.Name + "-kubeconfig",
+		}
+		if err := ctx.Client.Get(ctx, secretKey, secret); err != nil {
+			return false, errors.Wrapf(err, "failed to retrieve kubeconfig secret for the cluster %s/%s",
+				ctx.ICSCluster.Namespace, ctx.ICSCluster.Name)
+		}
+		value, ok := secret.Data["value"]
+		if !ok {
+			return false, errors.New("error retrieving kubeconfig data: secret value key is missing")
+		}
+		data := strings.Replace(string(value), "https://127.0.0.1:6443", apiServer, -1)
+		secret.Data["value"] = []byte(data)
+
+		err = r.Client.Update(ctx, secret.DeepCopy())
+		if err != nil {
+			return false, errors.Wrapf(err,"failed to update the secret object")
+		}
+	}
+	ctx.Logger.Info(
+		"ControlPlaneEndpoin discovered via control plane machine",
+		"controlPlaneEndpoint", ctx.ICSCluster.Spec.ControlPlaneEndpoint)
+
+	return true, nil
 }
 
 var (
@@ -508,6 +629,67 @@ func (r clusterReconciler) isAPIServerOnline(ctx *context.ClusterContext) bool {
 		}
 	}
 	return false
+}
+
+func (r clusterReconciler) syncCustomKubeConfig(ctx *context.ClusterContext) {
+	if kubeClient, err := infrautilv1.NewKubeClient(ctx, ctx.Client, ctx.Cluster); err == nil {
+		clusterInfo, err := kubeClient.CoreV1().ConfigMaps("kube-public").Get(ctx, "cluster-info", metav1.GetOptions{})
+		if err == nil {
+			defaultAPIEndpoint := "127.0.0.1:6443"
+			customerConfig := clusterInfo.Data["kubeconfig"]
+			if !strings.Contains(customerConfig, defaultAPIEndpoint) {
+				return
+			}
+			syncCustom := true
+			apiServer := fmt.Sprintf("%s:%d", ctx.ICSCluster.Spec.ControlPlaneEndpoint.Host,
+				ctx.ICSCluster.Spec.ControlPlaneEndpoint.Port)
+			data := strings.Replace(customerConfig, defaultAPIEndpoint, apiServer, -1)
+			klog.Infof("DavidWang# kubeconfig: %s", data)
+			clusterInfo.Data["kubeconfig"] = data
+			_, err = kubeClient.CoreV1().ConfigMaps("kube-public").Update(ctx, clusterInfo, metav1.UpdateOptions{})
+			if err != nil {
+				klog.Errorf("failed to update customer cluster info %s/%s", ctx.ICSCluster.Namespace, ctx.ICSCluster.Name)
+				syncCustom = false
+			} else {
+				ctx.Logger.Info("Sync custom cluster kubeconfig success",
+					"Namespace", ctx.ICSCluster.Namespace, "Name", ctx.ICSCluster.Name)
+			}
+			kubeadmConfig, err := kubeClient.CoreV1().ConfigMaps("kube-system").Get(ctx, "kubeadm-config", metav1.GetOptions{})
+			if err == nil {
+				customerConfig = kubeadmConfig.Data["ClusterConfiguration"]
+				if strings.Contains(customerConfig, defaultAPIEndpoint) {
+					data = strings.Replace(customerConfig, defaultAPIEndpoint, apiServer, -1)
+					kubeadmConfig.Data["ClusterConfiguration"] = data
+					_, err = kubeClient.CoreV1().ConfigMaps("kube-system").Update(ctx, kubeadmConfig, metav1.UpdateOptions{})
+					if err != nil {
+						klog.Errorf("failed to update customer cluster kubeadm Config %s/%s", ctx.ICSCluster.Namespace, ctx.ICSCluster.Name)
+						syncCustom = false
+					}
+				}
+			}
+			kubeProxy, err := kubeClient.CoreV1().ConfigMaps("kube-system").Get(ctx, "kube-proxy", metav1.GetOptions{})
+			if err == nil {
+				kubeConfig := kubeProxy.Data["kubeconfig.conf"]
+				if strings.Contains(kubeConfig, defaultAPIEndpoint) {
+					data = strings.Replace(kubeConfig, defaultAPIEndpoint, apiServer, -1)
+					kubeProxy.Data["kubeconfig.conf"] = data
+					_, err = kubeClient.CoreV1().ConfigMaps("kube-system").Update(ctx, kubeProxy, metav1.UpdateOptions{})
+					if err != nil {
+						klog.Errorf("failed to update customer cluster kubeproxy Config %s/%s", ctx.ICSCluster.Namespace, ctx.ICSCluster.Name)
+						syncCustom = false
+					}
+				}
+			}
+			if syncCustom {
+				klog.Infof("Sync custom cluster %s/%s apiServer Endpoint to %s", ctx.ICSCluster.Namespace,
+					ctx.ICSCluster.Name, apiServer)
+			}
+		} else {
+			klog.Errorf("failed to get customer cluster info %s/%s cluster-info configMap", ctx.ICSCluster.Namespace, ctx.ICSCluster.Name)
+		}
+		return
+	}
+	klog.Errorf("failed to connect customer cluster %s/%s", ctx.ICSCluster.Namespace, ctx.ICSCluster.Name)
 }
 
 func (r clusterReconciler) isControlPlaneInitialized(ctx *context.ClusterContext) bool {
