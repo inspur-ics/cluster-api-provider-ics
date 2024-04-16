@@ -51,7 +51,7 @@ import (
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/record"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services"
-	"github.com/inspur-ics/cluster-api-provider-ics/pkg/util"
+	infrautilv1 "github.com/inspur-ics/cluster-api-provider-ics/pkg/util"
 )
 
 const hostInfoErrStr = "host info cannot be used as a label value"
@@ -264,7 +264,7 @@ func (r machineReconciler) reconcileNormal(ctx context.MachineContext) (reconcil
 
 	// Make sure bootstrap data is available and populated.
 	if ctx.GetMachine().Spec.Bootstrap.DataSecretName == nil {
-		if util.IsControlPlaneMachine(ctx.GetICSMachine()) && !conditions.IsTrue(ctx.GetCluster(), clusterv1.ControlPlaneInitializedCondition) {
+		if infrautilv1.IsControlPlaneMachine(ctx.GetICSMachine()) && !conditions.IsTrue(ctx.GetCluster(), clusterv1.ControlPlaneInitializedCondition) {
 			ctx.GetLogger().Info("Waiting for the control plane to be initialized")
 			conditions.MarkFalse(ctx.GetICSMachine(), infrav1.VMProvisionedCondition, clusterv1.WaitingForControlPlaneAvailableReason, clusterv1.ConditionSeverityInfo, "")
 			return ctrl.Result{}, nil
@@ -291,8 +291,28 @@ func (r machineReconciler) reconcileNormal(ctx context.MachineContext) (reconcil
 	}
 
 	conditions.MarkTrue(ctx.GetICSMachine(), infrav1.VMProvisionedCondition)
+
+	//delete the method after the ICKS add CCM feature for providerID
+	//_ = r.checkOrUpdateMachineProviderID(ctx)
+
 	return reconcile.Result{}, nil
 }
+
+//func (r *machineReconciler) checkOrUpdateMachineProviderID(ctx context.MachineContext) error {
+//	customCtx := goctx.Background()
+//	if kubeClient, err := infrautilv1.NewKubeClient(customCtx, r.Client, ctx.GetCluster()); err == nil {
+//		machine := ctx.GetMachine()
+//		if customNode, err := kubeClient.CoreV1().Nodes().Get(customCtx, machine.Name, metav1.GetOptions{}); err == nil {
+//			customNode.Spec.ProviderID = *ctx.(*context.VIMMachineContext).ICSMachine.Spec.ProviderID
+//			_, err = kubeClient.CoreV1().Nodes().Update(customCtx, customNode, metav1.UpdateOptions{})
+//			if err != nil {
+//				klog.Errorf("failed to patch providerID to %s/%s/%s", ctx.GetCluster().Namespace,
+//					ctx.GetCluster().Name, machine.Name)
+//			}
+//		}
+//	}
+//	return nil
+//}
 
 // patchMachineLabelsWithHostInfo adds the iNode host information as a label to the Machine object.
 // The iNode host information is added with the CAPI node label prefix
@@ -303,7 +323,7 @@ func (r *machineReconciler) patchMachineLabelsWithHostInfo(ctx context.MachineCo
 		return err
 	}
 
-	info := util.SanitizeHostInfoLabel(hostInfo)
+	info := infrautilv1.SanitizeHostInfoLabel(hostInfo)
 	errs := validation.IsValidLabelValue(info)
 	if len(errs) > 0 {
 		err := errors.Errorf("%s: %s", hostInfoErrStr, strings.Join(errs, ","))
@@ -326,7 +346,7 @@ func (r *machineReconciler) patchMachineLabelsWithHostInfo(ctx context.MachineCo
 
 func (r *machineReconciler) getClusterToICSMachinesReq(a client.Object) []reconcile.Request {
 	requests := []reconcile.Request{}
-	machines, err := util.GetICSMachinesInCluster(goctx.Background(), r.Client, a.GetNamespace(), a.GetName())
+	machines, err := infrautilv1.GetICSMachinesInCluster(goctx.Background(), r.Client, a.GetNamespace(), a.GetName())
 	if err != nil {
 		return requests
 	}

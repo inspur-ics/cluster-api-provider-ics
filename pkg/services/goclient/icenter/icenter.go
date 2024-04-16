@@ -22,18 +22,16 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	"k8s.io/klog"
-
-	basetypv1 "github.com/inspur-ics/ics-go-sdk/client/types"
-	basehstv1 "github.com/inspur-ics/ics-go-sdk/host"
-	basenetv1 "github.com/inspur-ics/ics-go-sdk/network"
-	basestv1 "github.com/inspur-ics/ics-go-sdk/storage"
-	basevmv1 "github.com/inspur-ics/ics-go-sdk/vm"
 
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/goclient/image"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/goclient/template"
 	infrautilv1 "github.com/inspur-ics/cluster-api-provider-ics/pkg/util"
+	basetypv1 "github.com/inspur-ics/ics-go-sdk/client/types"
+	basehstv1 "github.com/inspur-ics/ics-go-sdk/host"
+	basenetv1 "github.com/inspur-ics/ics-go-sdk/network"
+	basestv1 "github.com/inspur-ics/ics-go-sdk/storage"
+	basevmv1 "github.com/inspur-ics/ics-go-sdk/vm"
 )
 
 const (
@@ -67,7 +65,6 @@ func ImportVM(ctx *context.VMContext, userdata string) error {
 		ctx.Logger.Error(err, "failed to find the ova image from ics")
 		return errors.Wrapf(err, "unable to get ova image for %q", ctx)
 	}
-	klog.Infof("DavidWang# FindOvaImageByName ovaImage: %+v", ovaImage)
 
 	storageService := basestv1.NewStorageService(ctx.GetSession().Client)
 	dataStore, err := storageService.GetStorageInfoByName(ctx, ctx.ICSVM.Spec.Datastore)
@@ -75,7 +72,6 @@ func ImportVM(ctx *context.VMContext, userdata string) error {
 		ctx.Logger.Error(err, "fail to find the data store from ics")
 		return errors.Wrapf(err, "unable to get DataStore for %q", ctx)
 	}
-	klog.Infof("DavidWang# GetStorageInfoByName dataStore: %+v", dataStore)
 
 	networks := make(map[int]basetypv1.Network)
 	networkService := basenetv1.NewNetworkService(ctx.GetSession().Client)
@@ -87,7 +83,6 @@ func ImportVM(ctx *context.VMContext, userdata string) error {
 		}
 		networks[index] = *network
 	}
-	klog.Infof("DavidWang# GetNetworkByName networks: %+v", networks)
 
 	host, err := getAvailableHosts(ctx, *dataStore, networks)
 	if err != nil {
@@ -101,9 +96,8 @@ func ImportVM(ctx *context.VMContext, userdata string) error {
 		ctx.Logger.Error(err, "fail to find the vm template from ics")
 		return errors.Wrapf(err, "unable to get vm template for %q", ctx)
 	}
-	klog.Infof("DavidWang# vm template ovaConfig: %+v", ovaConfig)
 	vmForm := *ovaConfig
-	vmForm.UUID = uuid.New().String()
+	vmForm.UUID = uuid.New().String()   // the vm path /sys/class/dmi/id/product_uuid
 	vmForm.Name = ctx.ICSVM.Name
 	vmForm.HostID = host.ID
 	vmForm.HostName = host.HostName
@@ -139,8 +133,6 @@ func ImportVM(ctx *context.VMContext, userdata string) error {
 		UserData:       userdata,
 		DataSourceType: "OPENSTACK",
 	}
-
-	klog.Infof("DavidWang# ImportVM, host id: %s, ovaFilePath: %s, vmForm: %+v", host.ID, ovaFilePath, vmForm)
 
 	virtualMachineService := basevmv1.NewVirtualMachineService(ctx.GetSession().Client)
 	task, err := virtualMachineService.ImportVM(ctx, vmForm, ovaFilePath, ovaImage.ServerID, 100)
@@ -314,7 +306,6 @@ func getAvailableHosts(ctx *context.VMContext,
 	if err != nil {
 		return basetypv1.Host{}, err
 	}
-	klog.Infof("DavidWang# GetHostList hosts: %+v", hosts)
 
 	storageHosts, err := hostService.GetHostListByStorageID(ctx, dataStore.ID)
 	if err != nil {
@@ -325,7 +316,6 @@ func getAvailableHosts(ctx *context.VMContext,
 			storageHostsIndex[host.ID] = host.Name
 		}
 	}
-	klog.Infof("DavidWang# GetHostListByStorageID dataStore[%s] storageHosts: %+v", dataStore.ID, storageHosts)
 
 	hostBounds := make(map[string]int)
 	for _, network := range networks {
@@ -338,7 +328,6 @@ func getAvailableHosts(ctx *context.VMContext,
 				hostBounds[host.ID]++
 			}
 		}
-		klog.Infof("DavidWang# GetHostListByNetworkID network[%s] networkHosts: %+v", network.ID, networkHosts)
 	}
 	totalBounds := len(networks)
 	for hostID, bounds := range hostBounds {
@@ -360,6 +349,5 @@ func getAvailableHosts(ctx *context.VMContext,
 		index := rand.Intn(len(availableHosts))
 		host = availableHosts[index]
 	}
-	klog.Infof("DavidWang# availableHosts host: %+v", host)
 	return host, nil
 }

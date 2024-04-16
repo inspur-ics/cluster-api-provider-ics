@@ -6,6 +6,7 @@ metadata:
 spec:
   conversion:
     strategy: Webhook
+    conversionReviewVersions: ["v1", "v1beta1"]
     webhook:
       clientConfig:
         # this is "\n" used as a placeholder, otherwise it will be rejected by the apiserver for being blank,

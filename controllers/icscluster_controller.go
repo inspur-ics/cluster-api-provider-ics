@@ -644,7 +644,6 @@ func (r clusterReconciler) syncCustomKubeConfig(ctx *context.ClusterContext) {
 			apiServer := fmt.Sprintf("%s:%d", ctx.ICSCluster.Spec.ControlPlaneEndpoint.Host,
 				ctx.ICSCluster.Spec.ControlPlaneEndpoint.Port)
 			data := strings.Replace(customerConfig, defaultAPIEndpoint, apiServer, -1)
-			klog.Infof("DavidWang# kubeconfig: %s", data)
 			clusterInfo.Data["kubeconfig"] = data
 			_, err = kubeClient.CoreV1().ConfigMaps("kube-public").Update(ctx, clusterInfo, metav1.UpdateOptions{})
 			if err != nil {

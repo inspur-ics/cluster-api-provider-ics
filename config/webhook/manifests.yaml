@@ -1,60 +1,12 @@
 ---
 apiVersion: admissionregistration.k8s.io/v1
-kind: MutatingWebhookConfiguration
-metadata:
-  creationTimestamp: null
-  name: mutating-webhook-configuration
-webhooks:
-- admissionReviewVersions:
-  - v1beta1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /mutate-infrastructure-cluster-x-k8s-io-v1beta1-icscluster
-  failurePolicy: Fail
-  matchPolicy: Equivalent
-  name: default.icscluster.infrastructure.cluster.x-k8s.io
-  rules:
-  - apiGroups:
-    - infrastructure.cluster.x-k8s.io
-    apiVersions:
-    - v1beta1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - icsclusters
-  sideEffects: None
-- admissionReviewVersions:
-  - v1beta1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /mutate-infrastructure-cluster-x-k8s-io-v1beta1-icsmachine
-  failurePolicy: Fail
-  matchPolicy: Equivalent
-  name: default.icsmachine.infrastructure.cluster.x-k8s.io
-  rules:
-  - apiGroups:
-    - infrastructure.cluster.x-k8s.io
-    apiVersions:
-    - v1beta1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - icsmachines
-  sideEffects: None
----
-apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
   creationTimestamp: null
   name: validating-webhook-configuration
 webhooks:
 - admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:
@@ -76,6 +28,7 @@ webhooks:
     - icsclusters
   sideEffects: None
 - admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:
@@ -97,6 +50,7 @@ webhooks:
     - icsmachines
   sideEffects: None
 - admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:
@@ -118,6 +72,7 @@ webhooks:
     - icsmachinetemplates
   sideEffects: None
 - admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:
@@ -139,6 +94,7 @@ webhooks:
     - icsvms
   sideEffects: None
 - admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:

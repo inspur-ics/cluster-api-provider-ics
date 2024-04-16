@@ -18,12 +18,10 @@ package v1beta1
 
 import (
 	"fmt"
-	"reflect"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -38,8 +36,7 @@ func (r *ICSCluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-// +kubebuilder:webhook:verbs=create;update,path=/validate-infrastructure-cluster-x-k8s-io-v1beta1-icscluster,mutating=false,failurePolicy=fail,matchPolicy=Equivalent,groups=infrastructure.cluster.x-k8s.io,resources=icsclusters,versions=v1beta1,name=validation.icscluster.infrastructure.cluster.x-k8s.io,sideEffects=None,admissionReviewVersions=v1beta1
-// +kubebuilder:webhook:verbs=create;update,path=/mutate-infrastructure-cluster-x-k8s-io-v1beta1-icscluster,mutating=true,failurePolicy=fail,matchPolicy=Equivalent,groups=infrastructure.cluster.x-k8s.io,resources=icsclusters,versions=v1beta1,name=default.icscluster.infrastructure.cluster.x-k8s.io,sideEffects=None,admissionReviewVersions=v1beta1
+// +kubebuilder:webhook:verbs=create;update,path=/validate-infrastructure-cluster-x-k8s-io-v1beta1-icscluster,mutating=false,failurePolicy=fail,matchPolicy=Equivalent,groups=infrastructure.cluster.x-k8s.io,resources=icsclusters,versions=v1beta1,name=validation.icscluster.infrastructure.cluster.x-k8s.io,sideEffects=None,admissionReviewVersions=v1;v1beta1
 
 var (
 	_ webhook.Defaulter = &ICSCluster{}
@@ -97,17 +94,6 @@ func (r *ICSCluster) ValidateUpdate(oldRaw runtime.Object) error {
 				r.Spec.IdentityRef, "field cannot be set to nil"),
 		)
 	}
-
-	// Allow change only for the first time.
-	if old.Spec.ControlPlaneEndpoint.Host == "" {
-		old.Spec.ControlPlaneEndpoint = clusterv1.APIEndpoint{}
-		r.Spec.ControlPlaneEndpoint = clusterv1.APIEndpoint{}
-	}
-
-	if !reflect.DeepEqual(old.Spec, r.Spec) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "cannot be modified"))
-	}
-
 	return aggregateObjErrors(r.GroupVersionKind().GroupKind(), r.Name, allErrs)
 }
 

@@ -116,7 +116,6 @@ func (s service) DoesExist(ctx *context.ClusterContext, wrapper Wrapper, moduleU
 	return provider.DoesModuleExist(ctx, moduleUUID, computeClusterRef)
 }
 
-//TODO. DavidWang
 func (s service) Remove(ctx *context.ClusterContext, moduleUUID string) error {
 	iCenterSession, err := fetchSession(ctx)
 	if err != nil {

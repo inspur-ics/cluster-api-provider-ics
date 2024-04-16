@@ -14,6 +14,8 @@ patchesStrategicMerge:
   - manager_image_patch.yaml
   - manager_pull_policy.yaml
   - manager_webhook_patch.yaml
+  # Inject certificate in the webhook definition.
+  - webhookcainjection_patch.yaml
 
 vars:
   - name: CERTIFICATE_NAMESPACE # namespace of the certificate CR

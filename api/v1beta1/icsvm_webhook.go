@@ -19,7 +19,6 @@ package v1beta1
 import (
 	"fmt"
 	"net"
-	"reflect"
 
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -38,7 +37,7 @@ func (r *ICSVM) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-// +kubebuilder:webhook:verbs=create;update,path=/validate-infrastructure-cluster-x-k8s-io-v1beta1-icsvm,mutating=false,failurePolicy=fail,matchPolicy=Equivalent,groups=infrastructure.cluster.x-k8s.io,resources=icsvms,versions=v1beta1,name=validation.icsvm.infrastructure.x-k8s.io,sideEffects=None,admissionReviewVersions=v1beta1
+// +kubebuilder:webhook:verbs=create;update,path=/validate-infrastructure-cluster-x-k8s-io-v1beta1-icsvm,mutating=false,failurePolicy=fail,matchPolicy=Equivalent,groups=infrastructure.cluster.x-k8s.io,resources=icsvms,versions=v1beta1,name=validation.icsvm.infrastructure.x-k8s.io,sideEffects=None,admissionReviewVersions=v1;v1beta1
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type.
 func (r *ICSVM) ValidateCreate() error {
@@ -63,40 +62,16 @@ func (r *ICSVM) ValidateCreate() error {
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type.
 //nolint:forcetypeassert
 func (r *ICSVM) ValidateUpdate(old runtime.Object) error {
-	newICSVM, err := runtime.DefaultUnstructuredConverter.ToUnstructured(r)
+	_, err := runtime.DefaultUnstructuredConverter.ToUnstructured(r)
 	if err != nil {
 		return apierrors.NewInternalError(errors.Wrap(err, "failed to convert new ICSVM to unstructured object"))
 	}
-	oldICSVM, err := runtime.DefaultUnstructuredConverter.ToUnstructured(old)
+	_, err = runtime.DefaultUnstructuredConverter.ToUnstructured(old)
 	if err != nil {
 		return apierrors.NewInternalError(errors.Wrap(err, "failed to convert old ICSVM to unstructured object"))
 	}
 
-	var allErrs field.ErrorList
-
-	newICSVMSpec := newICSVM["spec"].(map[string]interface{})
-	oldICSVMSpec := oldICSVM["spec"].(map[string]interface{})
-
-	// allow changes to biosUUID
-	delete(oldICSVMSpec, "biosUUID")
-	delete(newICSVMSpec, "biosUUID")
-
-	// allow changes to bootstrapRef
-	delete(oldICSVMSpec, "bootstrapRef")
-	delete(newICSVMSpec, "bootstrapRef")
-
-	newICSVMNetwork := newICSVMSpec["network"].(map[string]interface{})
-	oldICSVMNetwork := oldICSVMSpec["network"].(map[string]interface{})
-
-	// allow changes to the network devices
-	delete(oldICSVMNetwork, "devices")
-	delete(newICSVMNetwork, "devices")
-
-	if !reflect.DeepEqual(oldICSVMSpec, newICSVMSpec) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "cannot be modified"))
-	}
-
-	return aggregateObjErrors(r.GroupVersionKind().GroupKind(), r.Name, allErrs)
+	return nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type.
