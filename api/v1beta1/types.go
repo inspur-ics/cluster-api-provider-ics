@@ -38,6 +38,8 @@ const (
 	// clone mode, but it also prevents expanding a VMs disk beyond the size of
 	// the source VM/template.
 	LinkedClone CloneMode = "linkedClone"
+
+	ImportVM CloneMode = "importVM"
 )
 
 type ICSIdentityReference struct {
@@ -128,6 +130,32 @@ type VirtualMachineCloneSpec struct {
 	// virtual machine is cloned.
 	// +optional
 	DiskGiB int32 `json:"diskGiB,omitempty"`
+
+	// SSHUser specifies the name of a user that is granted remote access to the
+	// deployed VM.
+	// +optional
+	User *SSHUser `json:"user,omitempty"`
+}
+
+// AuthorizedMode describes the Authorized Type of the user.
+type AuthorizedMode string
+
+const (
+	SSHKey = AuthorizedMode("sshkey")
+
+	PasswordToken = AuthorizedMode("token")
+)
+
+// SSHUser is granted remote access to a system.
+type SSHUser struct {
+	// Name is the name of the vm system user.
+	Name string
+
+	// AuthorizedType is the authorized type that grant remote access.
+	AuthorizedType AuthorizedMode `json:"authorizedType"`
+
+	// AuthorizedKey is one SSH keys that grant remote access.
+	AuthorizedKey string `json:"authorizedKey"`
 }
 
 // NetworkSpec defines the virtual machine's network configuration.
@@ -154,6 +182,14 @@ type NetworkDeviceSpec struct {
 	// NetworkName is the name of the ics network to which the device
 	// will be connected.
 	NetworkName string `json:"networkName"`
+
+	// NetworkType the type of the ics network to which the device will be connected.
+	// +optional
+	NetworkType string `json:"networkType,omitempty"`
+
+	// SwitchType the type of the ics switch network to which the device will be connected.
+	// +optional
+	SwitchType string `json:"switchType,omitempty"`
 
 	// DeviceName may be used to explicitly assign a name to the network device
 	// as it exists in the guest operating system.

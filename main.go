@@ -110,7 +110,7 @@ func InitFlags(fs *pflag.FlagSet) {
 		"webhook-port",
 		9443,
 		"Webhook Server port (set to 0 to disable)")
-	fs.StringVar(
+	flag.StringVar(
 		&managerOpts.CertDir,
 		"webhook-cert-dir",
 		"/tmp/k8s-webhook-server/serving-certs/",
@@ -192,7 +192,7 @@ func main() {
 			if err := setupControllers(ctx, mgr); err != nil {
 				return err
 			}
-			if err := setupWebhooks(ctx, mgr); err != nil {
+			if err := setupWebhooks(mgr); err != nil {
 				return err
 			}
 		}
@@ -241,7 +241,7 @@ func setupControllers(ctx *context.ControllerManagerContext, mgr ctrlmgr.Manager
 	return nil
 }
 
-func setupWebhooks(ctx *context.ControllerManagerContext, mgr ctrlmgr.Manager) error {
+func setupWebhooks(mgr ctrlmgr.Manager) error {
 	if err := (&v1beta1.ICSCluster{}).SetupWebhookWithManager(mgr); err != nil {
 		return err
 	}

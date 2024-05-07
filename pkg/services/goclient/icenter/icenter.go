@@ -22,10 +22,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"k8s.io/klog"
 
+	infrav1 "github.com/inspur-ics/cluster-api-provider-ics/api/v1beta1"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/goclient/image"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/goclient/template"
+
 	infrautilv1 "github.com/inspur-ics/cluster-api-provider-ics/pkg/util"
 	basetypv1 "github.com/inspur-ics/ics-go-sdk/client/types"
 	basehstv1 "github.com/inspur-ics/ics-go-sdk/host"
@@ -44,10 +47,16 @@ const (
     "uuid":"VM_UUID"
 }
 `
+	CLOUDINITTYPE string = "OPENSTACK"
 )
 
 func CreateVM(ctx *context.VMContext, userdata string) error {
-	return ImportVM(ctx, userdata)
+	vmType := ctx.ICSVM.Spec.CloneMode
+	if vmType == infrav1.ImportVM {
+		return ImportVM(ctx, userdata)
+	} else {
+		return CloneVM(ctx, userdata)
+	}
 }
 
 // nolint:gocognit
@@ -61,7 +70,7 @@ func ImportVM(ctx *context.VMContext, userdata string) error {
 	}
 	imageName := ctx.ICSVM.Spec.Template
 	ovaImage, err := image.FindOvaImageByName(ctx, imageName)
-	if err != nil {
+	if err != nil || ovaImage == nil {
 		ctx.Logger.Error(err, "failed to find the ova image from ics")
 		return errors.Wrapf(err, "unable to get ova image for %q", ctx)
 	}
@@ -131,7 +140,7 @@ func ImportVM(ctx *context.VMContext, userdata string) error {
 	vmForm.CloudInit = basetypv1.CloudInit{
 		MetaData:       metadata,
 		UserData:       userdata,
-		DataSourceType: "OPENSTACK",
+		DataSourceType: CLOUDINITTYPE,
 	}
 
 	virtualMachineService := basevmv1.NewVirtualMachineService(ctx.GetSession().Client)
@@ -155,7 +164,7 @@ func ImportVM(ctx *context.VMContext, userdata string) error {
 
 // Clone kicks off a clone operation on vCenter to create a new virtual machine.
 // nolint:gocognit
-func CloneVM(ctx *context.VMContext, metadata []byte) error {
+func CloneVM(ctx *context.VMContext, userdata string) error {
 	ctx = &context.VMContext{
 		ControllerContext: ctx.ControllerContext,
 		ICSVM:             ctx.ICSVM,
@@ -166,11 +175,12 @@ func CloneVM(ctx *context.VMContext, metadata []byte) error {
 
 	vmTemplate := basetypv1.VirtualMachine{}
 	tpl, err := template.FindTemplate(ctx, ctx.ICSVM.Spec.Template)
-	if err != nil {
+	if err != nil || tpl == nil {
 		ctx.Logger.Error(err, "fail to find the vm template from ics")
 		return errors.Wrapf(err, "unable to get vm template for %q", ctx)
 	}
 	vmTemplate = *tpl
+	vmTemplate.UUID = uuid.New().String()   // the vm path /sys/class/dmi/id/product_uuid
 	vmTemplate.Name = ctx.ICSVM.Name
 
 	storageService := basestv1.NewStorageService(ctx.GetSession().Client)
@@ -213,6 +223,22 @@ func CloneVM(ctx *context.VMContext, metadata []byte) error {
 		return errors.Wrapf(err, "error getting network specs for %q", ctx)
 	}
 	vmTemplate.Nics = networkSpecs
+
+	metadata := strings.ReplaceAll(METADATA, "VM_HOST_NAME", vmTemplate.Name)
+	metadata = strings.ReplaceAll(metadata, "VM_UUID", vmTemplate.UUID)
+
+	vmTemplate.CloudInit = basetypv1.CloudInit{
+		MetaData:       metadata,
+		UserData:       userdata,
+		DataSourceType: CLOUDINITTYPE,
+	}
+
+	if user := ctx.ICSVM.Spec.User; user != nil && user.AuthorizedType == infrav1.PasswordToken {
+		vmTemplate.GuestOSAuthInfo.UserName = user.Name
+		vmTemplate.GuestOSAuthInfo.UserPwd = user.AuthorizedKey
+	}
+
+	klog.Infof("create vm request body: %+v", vmTemplate)
 
 	virtualMachineService := basevmv1.NewVirtualMachineService(ctx.GetSession().Client)
 	task, err := virtualMachineService.CreateVMByTemplate(ctx, vmTemplate, true)
