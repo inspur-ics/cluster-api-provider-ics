@@ -120,7 +120,7 @@ func ImportVM(ctx *context.VMContext, userdata string) error {
 		vmForm.CPUSocket = vmForm.CPUNum / vmForm.CPUCore
 	}
 
-	diskSpecs, err := getDiskSpecs(dataStore, ovaConfig.Disks)
+	diskSpecs, err := getOVADisks(dataStore, ovaConfig.Disks)
 	if err != nil {
 		ctx.Logger.Error(err, "fail to find the disk spec")
 		return errors.Wrapf(err, "error getting disk spec for %q", ctx)
@@ -210,7 +210,7 @@ func CloneVM(ctx *context.VMContext, userdata string) error {
 	vmTemplate.HostName = host.HostName
 	vmTemplate.HostIP = host.Name
 
-	diskSpecs, err := getDiskSpecs(dataStore, tpl.Disks)
+	diskSpecs, err := getMultiDisks(dataStore, ctx.ICSVM.Spec.Disks, tpl.Disks)
 	if err != nil {
 		ctx.Logger.Error(err, "fail to find the disk spec")
 		return errors.Wrapf(err, "error getting disk spec for %q", ctx)
@@ -258,7 +258,7 @@ func CloneVM(ctx *context.VMContext, userdata string) error {
 	return nil
 }
 
-func getDiskSpecs(dataStore *basetypv1.Storage,
+func getOVADisks(dataStore *basetypv1.Storage,
 	devices []basetypv1.Disk) ([]basetypv1.Disk, error) {
 
 	disks := []basetypv1.Disk{}
@@ -271,6 +271,61 @@ func getDiskSpecs(dataStore *basetypv1.Storage,
 	}
 
 	return disks, nil
+}
+
+func getMultiDisks(dataStore *basetypv1.Storage,
+	specs []infrav1.DiskSpec, devices []basetypv1.Disk) ([]basetypv1.Disk, error) {
+
+	disks := []basetypv1.Disk{}
+	sysDisk := devices[0]
+	sysDisk.Volume.DataStoreID = dataStore.ID
+	sysDisk.Volume.DataStoreName = dataStore.Name
+	sysDisk.Volume.Format= "RAW"
+	sysDisk.Volume.Size = float64(specs[0].DiskSize)
+	sysDisk.Volume.SizeInByte = int(specs[0].DiskSize) * 1024 * 1024 * 1024
+	disks = append(disks, sysDisk)
+	if len(specs) >= 2 {
+		for i := 1; i < len(specs); i++ {
+			disk := initDisk()
+			disk.Volume.DataStoreID = dataStore.ID
+			disk.Volume.DataStoreName = dataStore.Name
+			disk.Volume.Size = float64(specs[i].DiskSize)
+			disk.Volume.SizeInByte = int(specs[i].DiskSize) * 1024 * 1024 * 1024
+			if specs[i].BusModel != "" {
+				disk.BusModel = specs[i].BusModel
+			}
+			if specs[i].VolumePolicy != "" {
+				disk.Volume.VolumePolicy = specs[i].VolumePolicy
+			}
+
+			disks = append(disks, disk)
+		}
+	}
+
+	return disks, nil
+}
+
+func initDisk() basetypv1.Disk {
+	disk := basetypv1.Disk {
+		QueueNum: 1,
+		BusModel: "VIRTIO",
+		EnableNativeIO: false,
+		EnableKernelIO: false,
+		TotalIops: 0,
+		ReadIops: 0,
+		WriteIops: 0,
+		TotalBps: 0,
+		ReadBps: 0,
+		WriteBps: 0,
+		Volume: basetypv1.Volume{
+			Bootable: false,
+			Format: "RAW",
+			Shared: false,
+			FormatDisk: false,
+			VolumePolicy: "THIN",
+		},
+	}
+	return disk
 }
 
 func getNetworkSpecs(ctx *context.VMContext, devices []basetypv1.Nic,

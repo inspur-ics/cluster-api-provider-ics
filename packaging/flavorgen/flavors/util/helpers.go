@@ -58,12 +58,6 @@ var (
 		{
 			Kind:      "ICSMachineTemplate",
 			Name:      "${CLUSTER_NAME}-control-plane",
-			Value:     env.DefaultDiskGiB,
-			FieldPath: []string{"spec", "template", "spec", "diskGiB"},
-		},
-		{
-			Kind:      "ICSMachineTemplate",
-			Name:      "${CLUSTER_NAME}-control-plane",
 			Value:     env.DefaultMemoryMiB,
 			FieldPath: []string{"spec", "template", "spec", "memoryMiB"},
 		},
@@ -72,12 +66,6 @@ var (
 			Name:      "${CLUSTER_NAME}-control-plane",
 			Value:     env.DefaultNumCPUs,
 			FieldPath: []string{"spec", "template", "spec", "numCPUs"},
-		},
-		{
-			Kind:      "ICSMachineTemplate",
-			Name:      "${CLUSTER_NAME}-md-0",
-			Value:     env.DefaultDiskGiB,
-			FieldPath: []string{"spec", "template", "spec", "diskGiB"},
 		},
 		{
 			Kind:      "ICSMachineTemplate",

@@ -162,7 +162,6 @@ func defaultVirtualMachineCloneSpec() infrav1.VirtualMachineCloneSpec {
 		},
 		CloneMode:         infrav1.LinkedClone,
 		NumCPUs:           2,
-		DiskGiB:           20,
 		MemoryMiB:         8192,
 		Template:          env.ICSTemplateVar,
 		Datastore:         env.ICSDatastoreVar,

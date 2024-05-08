@@ -107,12 +107,28 @@ spec:
                 description: Datastore is the name or inventory path of the datastore
                   in which the virtual machine is created/located.
                 type: string
-              diskGiB:
-                description: DiskGiB is the size of a virtual machine's disk, in GiB.
-                  Defaults to the eponymous property value in the template from which
-                  the virtual machine is cloned.
-                format: int32
-                type: integer
+              disks:
+                description: Disks is the vm disks configuration for this machine's
+                  VM.
+                items:
+                  properties:
+                    busModel:
+                      description: 'BusModel default value: VIRTIO'
+                      type: string
+                    diskSize:
+                      description: DiskSize is the size of a virtual machine's disk,
+                        in GiB. Defaults to the eponymous property value in the template
+                        from which the virtual machine is cloned.
+                      format: int32
+                      type: integer
+                    volumeFormat:
+                      description: Default RAW, RAW\QCOW2
+                      type: string
+                    volumePolicy:
+                      description: Default THIN, THIN\THICK
+                      type: string
+                  type: object
+                type: array
               identityRef:
                 description: IdentityRef is a reference to either a Secret that contains
                   the identity to use when reconciling the cluster.
@@ -203,6 +219,10 @@ spec:
                           description: NetworkName is the name of the ics network
                             to which the device will be connected.
                           type: string
+                        networkType:
+                          description: NetworkType the type of the ics network to
+                            which the device will be connected.
+                          type: string
                         routes:
                           description: Routes is a list of optional, static routes
                             applied to the device.
@@ -233,6 +253,10 @@ spec:
                           items:
                             type: string
                           type: array
+                        switchType:
+                          description: SwitchType the type of the ics switch network
+                            to which the device will be connected.
+                          type: string
                       required:
                       - networkName
                       type: object
@@ -287,6 +311,25 @@ spec:
                 description: Template is the name or inventory path of the template
                   used to clone the virtual machine.
                 type: string
+              user:
+                description: SSHUser specifies the name of a user that is granted
+                  remote access to the deployed VM.
+                properties:
+                  authorizedKey:
+                    description: AuthorizedKey is one SSH keys that grant remote access.
+                    type: string
+                  authorizedType:
+                    description: AuthorizedType is the authorized type that grant
+                      remote access.
+                    type: string
+                  name:
+                    description: Name is the name of the vm system user.
+                    type: string
+                required:
+                - authorizedKey
+                - authorizedType
+                - name
+                type: object
             required:
             - network
             - template
@@ -522,12 +565,28 @@ spec:
                 description: Datastore is the name or inventory path of the datastore
                   in which the virtual machine is created/located.
                 type: string
-              diskGiB:
-                description: DiskGiB is the size of a virtual machine's disk, in GiB.
-                  Defaults to the eponymous property value in the template from which
-                  the virtual machine is cloned.
-                format: int32
-                type: integer
+              disks:
+                description: Disks is the vm disks configuration for this machine's
+                  VM.
+                items:
+                  properties:
+                    busModel:
+                      description: 'BusModel default value: VIRTIO'
+                      type: string
+                    diskSize:
+                      description: DiskSize is the size of a virtual machine's disk,
+                        in GiB. Defaults to the eponymous property value in the template
+                        from which the virtual machine is cloned.
+                      format: int32
+                      type: integer
+                    volumeFormat:
+                      description: Default RAW, RAW\QCOW2
+                      type: string
+                    volumePolicy:
+                      description: Default THIN, THIN\THICK
+                      type: string
+                  type: object
+                type: array
               identityRef:
                 description: IdentityRef is a reference to either a Secret that contains
                   the identity to use when reconciling the cluster.
@@ -618,6 +677,10 @@ spec:
                           description: NetworkName is the name of the ics network
                             to which the device will be connected.
                           type: string
+                        networkType:
+                          description: NetworkType the type of the ics network to
+                            which the device will be connected.
+                          type: string
                         routes:
                           description: Routes is a list of optional, static routes
                             applied to the device.
@@ -648,6 +711,10 @@ spec:
                           items:
                             type: string
                           type: array
+                        switchType:
+                          description: SwitchType the type of the ics switch network
+                            to which the device will be connected.
+                          type: string
                       required:
                       - networkName
                       type: object
@@ -702,6 +769,25 @@ spec:
                 description: Template is the name or inventory path of the template
                   used to clone the virtual machine.
                 type: string
+              user:
+                description: SSHUser specifies the name of a user that is granted
+                  remote access to the deployed VM.
+                properties:
+                  authorizedKey:
+                    description: AuthorizedKey is one SSH keys that grant remote access.
+                    type: string
+                  authorizedType:
+                    description: AuthorizedType is the authorized type that grant
+                      remote access.
+                    type: string
+                  name:
+                    description: Name is the name of the vm system user.
+                    type: string
+                required:
+                - authorizedKey
+                - authorizedType
+                - name
+                type: object
             required:
             - network
             - template

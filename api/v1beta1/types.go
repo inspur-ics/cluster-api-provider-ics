@@ -125,11 +125,9 @@ type VirtualMachineCloneSpec struct {
 	// +optional
 	MemoryMiB int64 `json:"memoryMiB,omitempty"`
 
-	// DiskGiB is the size of a virtual machine's disk, in GiB.
-	// Defaults to the eponymous property value in the template from which the
-	// virtual machine is cloned.
+	// Disks is the vm disks configuration for this machine's VM.
 	// +optional
-	DiskGiB int32 `json:"diskGiB,omitempty"`
+	Disks []DiskSpec `json:"disks,omitempty"`
 
 	// SSHUser specifies the name of a user that is granted remote access to the
 	// deployed VM.
@@ -149,13 +147,33 @@ const (
 // SSHUser is granted remote access to a system.
 type SSHUser struct {
 	// Name is the name of the vm system user.
-	Name string
+	Name string `json:"name"`
 
 	// AuthorizedType is the authorized type that grant remote access.
 	AuthorizedType AuthorizedMode `json:"authorizedType"`
 
 	// AuthorizedKey is one SSH keys that grant remote access.
 	AuthorizedKey string `json:"authorizedKey"`
+}
+
+type DiskSpec struct {
+	// DiskSize is the size of a virtual machine's disk, in GiB.
+	// Defaults to the eponymous property value in the template from which the
+	// virtual machine is cloned.
+	// +optional
+	DiskSize int32 `json:"diskSize,omitempty"`
+
+	// BusModel default value: VIRTIO
+	// +optional
+	BusModel string `json:"busModel,omitempty"`
+
+	// Default RAW, RAW\QCOW2
+	// +optional
+	VolumeFormat string `json:"volumeFormat,omitempty"`
+
+	// Default THIN, THIN\THICK
+	// +optional
+	VolumePolicy string `json:"volumePolicy,omitempty"`
 }
 
 // NetworkSpec defines the virtual machine's network configuration.
