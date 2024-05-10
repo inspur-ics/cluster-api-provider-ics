@@ -25,10 +25,12 @@ import (
 
 	basecltv1 "github.com/inspur-ics/ics-go-sdk/client"
 	basetypv1 "github.com/inspur-ics/ics-go-sdk/client/types"
+	basetkv1 "github.com/inspur-ics/ics-go-sdk/task"
 	basevmv1 "github.com/inspur-ics/ics-go-sdk/vm"
 
 	infrav1 "github.com/inspur-ics/cluster-api-provider-ics/api/v1beta1"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
+	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/goclient/icenter"
 	infrautilv1 "github.com/inspur-ics/cluster-api-provider-ics/pkg/util"
 )
 
@@ -72,6 +74,38 @@ func GetNetworkStatus(
 	// defensive check to ensure we are not removing the biosUUID
 	if vm.UUID != "" {
 		ctx.ICSVM.Spec.BiosUUID = vm.UUID
+	}
+
+	// set static ip for the second or more nics
+	nicDevices := ctx.ICSVM.Spec.Network.Devices
+	if len(nicDevices) >= 2 {
+		isStatic := false
+		for i := 1; i < len(nicDevices); i++ {
+			device := nicDevices[i]
+			if device.DHCP4 || device.DHCP6 {
+				continue
+			}
+			isStatic = true
+			break
+		}
+		if isStatic && len(vm.Nics) == len(nicDevices) {
+			for index := 1; index < len(nicDevices); index++ {
+				device := nicDevices[index]
+				if device.DHCP4 || device.DHCP6 {
+					continue
+				}
+				nic := &vm.Nics[index]
+				icenter.UpdateNicIPConfig(ctx, nic, &nicDevices[index])
+			}
+			task, err := virtualMachineService.SetVM(ctx, *vm)
+			if err != nil {
+				ctx.Logger.Error(err, "failed to set static ips for vm nics", "id", moRef)
+			} else {
+				// Wait for the VM to be edited.
+				taskService := basetkv1.NewTaskService(ctx.Session.Client)
+				_, _ = taskService.WaitForResult(ctx, task)
+			}
+		}
 	}
 
 	allNetStatus := []NetworkStatus{}

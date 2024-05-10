@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/klog"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	clusterutilv1 "sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/annotations"
@@ -293,26 +294,26 @@ func (r machineReconciler) reconcileNormal(ctx context.MachineContext) (reconcil
 	conditions.MarkTrue(ctx.GetICSMachine(), infrav1.VMProvisionedCondition)
 
 	//delete the method after the ICKS add CCM feature for providerID
-	//_ = r.checkOrUpdateMachineProviderID(ctx)
+	_ = r.checkOrUpdateMachineProviderID(ctx)
 
 	return reconcile.Result{}, nil
 }
 
-//func (r *machineReconciler) checkOrUpdateMachineProviderID(ctx context.MachineContext) error {
-//	customCtx := goctx.Background()
-//	if kubeClient, err := infrautilv1.NewKubeClient(customCtx, r.Client, ctx.GetCluster()); err == nil {
-//		machine := ctx.GetMachine()
-//		if customNode, err := kubeClient.CoreV1().Nodes().Get(customCtx, machine.Name, metav1.GetOptions{}); err == nil {
-//			customNode.Spec.ProviderID = *ctx.(*context.VIMMachineContext).ICSMachine.Spec.ProviderID
-//			_, err = kubeClient.CoreV1().Nodes().Update(customCtx, customNode, metav1.UpdateOptions{})
-//			if err != nil {
-//				klog.Errorf("failed to patch providerID to %s/%s/%s", ctx.GetCluster().Namespace,
-//					ctx.GetCluster().Name, machine.Name)
-//			}
-//		}
-//	}
-//	return nil
-//}
+func (r *machineReconciler) checkOrUpdateMachineProviderID(ctx context.MachineContext) error {
+	customCtx := goctx.Background()
+	if kubeClient, err := infrautilv1.NewKubeClient(customCtx, r.Client, ctx.GetCluster()); err == nil {
+		machine := ctx.GetMachine()
+		if customNode, err := kubeClient.CoreV1().Nodes().Get(customCtx, machine.Name, metav1.GetOptions{}); err == nil {
+			customNode.Spec.ProviderID = *ctx.(*context.VIMMachineContext).ICSMachine.Spec.ProviderID
+			_, err = kubeClient.CoreV1().Nodes().Update(customCtx, customNode, metav1.UpdateOptions{})
+			if err != nil {
+				klog.Errorf("failed to patch providerID to %s/%s/%s", ctx.GetCluster().Namespace,
+					ctx.GetCluster().Name, machine.Name)
+			}
+		}
+	}
+	return nil
+}
 
 // patchMachineLabelsWithHostInfo adds the iNode host information as a label to the Machine object.
 // The iNode host information is added with the CAPI node label prefix
