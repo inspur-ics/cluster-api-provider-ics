@@ -942,6 +942,7 @@ func autoConvert_v1alpha4_NetworkDeviceSpec_To_v1beta1_NetworkDeviceSpec(in *Net
 	out.DeviceName = in.DeviceName
 	out.DHCP4 = in.DHCP4
 	out.DHCP6 = in.DHCP6
+	out.NetMask = in.NetMask
 	out.Gateway4 = in.Gateway4
 	out.Gateway6 = in.Gateway6
 	out.IPAddrs = *(*[]string)(unsafe.Pointer(&in.IPAddrs))
@@ -965,6 +966,7 @@ func autoConvert_v1beta1_NetworkDeviceSpec_To_v1alpha4_NetworkDeviceSpec(in *v1b
 	out.DeviceName = in.DeviceName
 	out.DHCP4 = in.DHCP4
 	out.DHCP6 = in.DHCP6
+	out.NetMask = in.NetMask
 	out.Gateway4 = in.Gateway4
 	out.Gateway6 = in.Gateway6
 	out.IPAddrs = *(*[]string)(unsafe.Pointer(&in.IPAddrs))

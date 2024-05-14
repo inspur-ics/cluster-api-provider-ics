@@ -226,6 +226,10 @@ type NetworkDeviceSpec struct {
 	// +optional
 	DHCP6 bool `json:"dhcp6,omitempty"`
 
+	// NetMask the network device network.
+	// +optional
+	NetMask string `json:"netMask,omitempty"`
+
 	// Gateway4 is the IPv4 gateway used by this device.
 	// Required when DHCP4 is false.
 	// +optional

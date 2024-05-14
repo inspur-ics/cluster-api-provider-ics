@@ -181,6 +181,9 @@ spec:
                                   items:
                                     type: string
                                   type: array
+                                netMask:
+                                  description: NetMask the network device network.
+                                  type: string
                                 networkName:
                                   description: NetworkName is the name of the ics
                                     network to which the device will be connected.
@@ -483,6 +486,9 @@ spec:
                                   items:
                                     type: string
                                   type: array
+                                netMask:
+                                  description: NetMask the network device network.
+                                  type: string
                                 networkName:
                                   description: NetworkName is the name of the ics
                                     network to which the device will be connected.

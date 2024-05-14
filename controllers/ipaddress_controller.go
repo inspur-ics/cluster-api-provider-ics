@@ -25,18 +25,13 @@ import (
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apitypes "k8s.io/apimachinery/pkg/types"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
-	clusterutilv1 "sigs.k8s.io/cluster-api/util"
-	"sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	ctrlutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
@@ -68,8 +63,8 @@ func AddIPAddressControllerToManager(ctx *context.ControllerManagerContext, mgr 
 		Recorder:                 record.New(mgr.GetEventRecorderFor(controllerNameLong)),
 		Logger:                   ctx.Logger.WithName(controllerNameShort),
 	}
-	r := ipaddressReconciler{ControllerContext: controllerContext}
-	controller, err := ctrl.NewControllerManagedBy(mgr).
+	r := ipAddressReconciler{ControllerContext: controllerContext}
+	_, err := ctrl.NewControllerManagedBy(mgr).
 		// Watch the controlled, infrastructure resource.
 		For(controlledType).
 		// Watch any IPAddress resources owned by the controlled type.
@@ -91,35 +86,15 @@ func AddIPAddressControllerToManager(ctx *context.ControllerManagerContext, mgr 
 	if err != nil {
 		return err
 	}
-
-	err = controller.Watch(
-		&source.Kind{Type: &clusterv1.Cluster{}},
-		handler.EnqueueRequestsFromMapFunc(r.getClusterToIPAddressesReq),
-		predicate.Funcs{
-			UpdateFunc: func(e event.UpdateEvent) bool {
-				oldCluster := e.ObjectOld.(*clusterv1.Cluster)
-				newCluster := e.ObjectNew.(*clusterv1.Cluster)
-				return oldCluster.Spec.Paused && !newCluster.Spec.Paused
-			},
-			CreateFunc: func(e event.CreateEvent) bool {
-				if _, ok := e.Object.GetAnnotations()[clusterv1.PausedAnnotation]; !ok {
-					return false
-				}
-				return true
-			},
-		})
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
-type ipaddressReconciler struct {
+type ipAddressReconciler struct {
 	*context.ControllerContext
 }
 
 // Reconcile ensures the back-end state reflects the Kubernetes resource state intent.
-func (r ipaddressReconciler) Reconcile(ctx goctx.Context, req ctrl.Request) (_ ctrl.Result, reterr error) {
+func (r ipAddressReconciler) Reconcile(ctx goctx.Context, req ctrl.Request) (_ ctrl.Result, reterr error) {
 	// Get the IPAddress resource for this request.
 	ipAddress := &infrav1.IPAddress{}
 	if err := r.Client.Get(r, req.NamespacedName, ipAddress); err != nil {
@@ -139,43 +114,9 @@ func (r ipaddressReconciler) Reconcile(ctx goctx.Context, req ctrl.Request) (_ c
 			ipAddress.Namespace,
 			ipAddress.Name)
 	}
-	// Fetch the ICSVM.
-	icsvm, err := r.getICSVMByIPAddress(r.ControllerContext, ipAddress)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
-	if icsvm == nil {
-		r.Logger.Info("Waiting for ICSVM Controller to set vmRef on IPAddress")
-		return reconcile.Result{}, nil
-	}
-	// Fetch the CAPI Cluster.
-	cluster, err := clusterutilv1.GetClusterFromMetadata(r, r.Client, icsvm.ObjectMeta)
-	if err != nil {
-		r.Logger.Info("ICSVM is missing cluster label or cluster does not exist")
-		return reconcile.Result{}, nil
-	}
-	if annotations.IsPaused(cluster, icsvm) {
-		r.Logger.V(4).Info("ICSVM %s/%s linked to a cluster that is paused",
-			icsvm.Namespace, icsvm.Name)
-		return reconcile.Result{}, nil
-	}
-	// Fetch the ICSCluster
-	icsCluster := &infrav1.ICSCluster{}
-	icsClusterName := ctrlclient.ObjectKey{
-		Namespace: ipAddress.Namespace,
-		Name:      cluster.Spec.InfrastructureRef.Name,
-	}
-	if err := r.Client.Get(r, icsClusterName, icsCluster); err != nil {
-		r.Logger.Info("Waiting for ICSCluster")
-		return reconcile.Result{}, nil
-	}
-
 	// Create the ipAddress context for this request.
 	ipAddressContext := &context.IPAddressContext{
 		ControllerContext: r.ControllerContext,
-		Cluster:           cluster,
-		ICSCluster:        icsCluster,
-		ICSVM:             icsvm,
 		IPAddress:         ipAddress,
 		Logger:            r.Logger.WithName(req.Namespace).WithName(req.Name),
 		PatchHelper:       patchHelper,
@@ -202,7 +143,7 @@ func (r ipaddressReconciler) Reconcile(ctx goctx.Context, req ctrl.Request) (_ c
 	return r.reconcileNormal(ipAddressContext)
 }
 
-func (r ipaddressReconciler) reconcileDelete(ctx *context.IPAddressContext) (reconcile.Result, error) {
+func (r ipAddressReconciler) reconcileDelete(ctx *context.IPAddressContext) (reconcile.Result, error) {
 	ctx.Logger.Info("Handling deleted IPAddress")
 
 	// The IPAddress is deleted so remove the finalizer.
@@ -210,60 +151,15 @@ func (r ipaddressReconciler) reconcileDelete(ctx *context.IPAddressContext) (rec
 	return reconcile.Result{}, nil
 }
 
-func (r ipaddressReconciler) reconcileNormal(ctx *context.IPAddressContext) (reconcile.Result, error) {// If the ICSMachine doesn't have our finalizer, add it.
+func (r ipAddressReconciler) reconcileNormal(ctx *context.IPAddressContext) (reconcile.Result, error) {// If the ICSMachine doesn't have our finalizer, add it.
 	ctrlutil.AddFinalizer(ctx.IPAddress, infrav1.IPAddressFinalizer)
-
-	if !ctx.Cluster.Status.InfrastructureReady {
-		ctx.Logger.Info("Cluster infrastructure is not ready yet")
-		return reconcile.Result{}, nil
-	}
-
 	return reconcile.Result{}, nil
-}
-
-func (r ipaddressReconciler) getICSVMByIPAddress(ctx *context.ControllerContext, ipAddress *infrav1.IPAddress) (*infrav1.ICSVM, error) {
-	// Get ready to find the associated ICSVM resource.
-	vm := &infrav1.ICSVM{}
-	vmKey := apitypes.NamespacedName{
-		Namespace: ipAddress.Namespace,
-		Name:      ipAddress.Spec.VMRef.Name,
-	}
-	// Attempt to find the associated ICSVM resource.
-	if err := ctx.Client.Get(ctx, vmKey, vm); err != nil {
-		return nil, err
-	}
-	return vm, nil
-}
-
-func (r *ipaddressReconciler) getClusterToIPAddressesReq(a ctrlclient.Object) []reconcile.Request {
-	requests := []reconcile.Request{}
-	ipAddresses := &infrav1.IPAddressList{}
-	err := r.Client.List(goctx.Background(), ipAddresses,
-		ctrlclient.InNamespace(a.GetNamespace()),
-		ctrlclient.MatchingLabels(
-		map[string]string{
-			clusterv1.ClusterLabelName: a.GetName(),
-		},
-	))
-	if err != nil {
-		return requests
-	}
-	for _, ipAddress := range ipAddresses.Items {
-		r := reconcile.Request{
-			NamespacedName: apitypes.NamespacedName{
-				Name:      ipAddress.Name,
-				Namespace: ipAddress.Namespace,
-			},
-		}
-		requests = append(requests, r)
-	}
-	return requests
 }
 
 // vmToIPAddresses is a handler.ToRequestsFunc to be used
 // to enqueue requests for reconciliation for IPAddress to update
 // its status.apiEndpoints field.
-func (r ipaddressReconciler) getVMToIPAddressesReq(a ctrlclient.Object) []reconcile.Request {
+func (r ipAddressReconciler) getVMToIPAddressesReq(a ctrlclient.Object) []reconcile.Request {
 	requests := []reconcile.Request{}
 	ipAddresses := &infrav1.IPAddressList{}
 	err := r.Client.List(goctx.Background(), ipAddresses,

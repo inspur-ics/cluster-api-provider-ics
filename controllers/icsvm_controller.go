@@ -278,11 +278,34 @@ func (r vmReconciler) reconcileDelete(ctx *context.VMContext) (reconcile.Result,
 			return reconcile.Result{}, nil
 		}
 	}
+	_ = r.reconcileIPAddressesDelete(ctx)
 
 	// The VM is deleted so remove the finalizer.
 	ctrlutil.RemoveFinalizer(ctx.ICSVM, infrav1.VMFinalizer)
 
 	return reconcile.Result{}, nil
+}
+
+func (r *vmReconciler) reconcileIPAddressesDelete(ctx *context.VMContext) error {
+	ipAddresses := &infrav1.IPAddressList{}
+	vm := ctx.ICSVM
+	err := r.Client.List(goctx.Background(), ipAddresses,
+		ctrlclient.InNamespace(vm.GetNamespace()),
+		ctrlclient.MatchingFields{"spec.vmRef.name": vm.GetName()},
+	)
+	if err != nil {
+		r.Logger.Info("Clear icsvm ipaddress resource")
+		return nil
+	}
+	for _, ipAddress := range ipAddresses.Items {
+		if ipAddress.GetDeletionTimestamp().IsZero() {
+			if err := r.Client.Delete(ctx, &ipAddress); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 func (r vmReconciler) reconcileNormal(ctx *context.VMContext, icsMachine *infrav1.ICSMachine) (reconcile.Result, error) {

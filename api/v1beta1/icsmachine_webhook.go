@@ -19,6 +19,7 @@ package v1beta1
 import (
 	"fmt"
 	"net"
+	"strings"
 
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -104,6 +105,9 @@ func (r *ICSMachine) ValidateUpdate(old runtime.Object) error {
 	spec := r.Spec
 	for i, device := range spec.Network.Devices {
 		for j, ip := range device.IPAddrs {
+			if !strings.Contains(ip, "/") {
+				continue
+			}
 			if _, _, err := net.ParseCIDR(ip); err != nil {
 				allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "network", fmt.Sprintf("devices[%d]", i), fmt.Sprintf("ipAddrs[%d]", j)), ip, "ip addresses should be in the CIDR format"))
 			}

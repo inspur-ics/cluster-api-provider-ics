@@ -19,6 +19,7 @@ package icenter
 import (
 	"math/rand"
 	"strings"
+	"sync"
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -48,6 +49,10 @@ const (
 }
 `
 	CLOUDINITTYPE string = "OPENSTACK"
+)
+
+var (
+	allocatedIPMu sync.Mutex
 )
 
 func CreateVM(ctx *context.VMContext, userdata string) error {
@@ -89,6 +94,18 @@ func ImportVM(ctx *context.VMContext, userdata string) error {
 		if err != nil {
 			ctx.Logger.Error(err, "fail to find the network devices from ics")
 			return errors.Wrapf(err, "unable to get networks for %q", ctx)
+		}
+		if network.VswitchDto.SwitchType == "SDNSWITCH" && len(device.DeviceName) > 0 {
+			sdnNet, err := networkService.GetSdnNetworkByID(ctx, network.ID)
+			if err == nil {
+				for _, subNet := range sdnNet.SubnetKeys {
+					if subNet.Name == device.DeviceName {
+						network.ResourceID = subNet.ID
+						network.Name = subNet.Name
+						break
+					}
+				}
+			}
 		}
 		networks[index] = *network
 	}
@@ -141,6 +158,14 @@ func ImportVM(ctx *context.VMContext, userdata string) error {
 		MetaData:       metadata,
 		UserData:       userdata,
 		DataSourceType: CLOUDINITTYPE,
+	}
+
+	if ctx.ICSVM.Spec.User != nil {
+		user := ctx.ICSVM.Spec.User
+		if user.AuthorizedType == infrav1.PasswordToken {
+			vmForm.GuestOSAuthInfo.UserName = user.Name
+			vmForm.GuestOSAuthInfo.UserPwd = user.AuthorizedKey
+		}
 	}
 
 	virtualMachineService := basevmv1.NewVirtualMachineService(ctx.GetSession().Client)
@@ -198,6 +223,17 @@ func CloneVM(ctx *context.VMContext, userdata string) error {
 			ctx.Logger.Error(err, "fail to find the network devices from ics")
 			return errors.Wrapf(err, "unable to get networks for %q", ctx)
 		}
+		if network.VswitchDto.SwitchType == "SDNSWITCH" && len(device.DeviceName) > 0 {
+			sdnNet, err := networkService.GetSdnNetworkByID(ctx, network.ID)
+			if err == nil {
+				for _, subNet := range sdnNet.SubnetKeys {
+					if subNet.Name == device.DeviceName {
+						network.ResourceID = subNet.ID
+						break
+					}
+				}
+			}
+		}
 		networks[index] = *network
 	}
 
@@ -209,6 +245,31 @@ func CloneVM(ctx *context.VMContext, userdata string) error {
 	vmTemplate.HostID = host.ID
 	vmTemplate.HostName = host.HostName
 	vmTemplate.HostIP = host.Name
+
+	// vm cpu config
+	cpuNum := ctx.ICSVM.Spec.NumCPUs
+	if vmTemplate.CPUNum % 2 == 0 {
+		vmTemplate.CPUCore = 2
+		vmTemplate.CPUSocket = int(cpuNum) / vmTemplate.CPUCore
+	} else {
+		vmTemplate.CPUCore = 1
+		vmTemplate.CPUSocket = int(cpuNum) / vmTemplate.CPUCore
+	}
+
+	// vm memory config
+	memory := ctx.ICSVM.Spec.MemoryMiB
+	vmTemplate.Memory = int(memory)
+	vmTemplate.MemoryInByte = vmTemplate.Memory * 1024 * 1024
+	vmTemplate.MaxMemory = vmTemplate.Memory
+	vmTemplate.MaxMemoryInByte = vmTemplate.MemoryInByte
+
+	if ctx.ICSVM.Spec.User != nil {
+		user := ctx.ICSVM.Spec.User
+		if user.AuthorizedType == infrav1.PasswordToken {
+			vmTemplate.GuestOSAuthInfo.UserName = user.Name
+			vmTemplate.GuestOSAuthInfo.UserPwd = user.AuthorizedKey
+		}
+	}
 
 	diskSpecs, err := getMultiDisks(dataStore, ctx.ICSVM.Spec.Disks, tpl.Disks)
 	if err != nil {
@@ -280,6 +341,7 @@ func getMultiDisks(dataStore *basetypv1.Storage,
 	sysDisk := devices[0]
 	sysDisk.Volume.DataStoreID = dataStore.ID
 	sysDisk.Volume.DataStoreName = dataStore.Name
+	sysDisk.Volume.DataStoreType = dataStore.DataStoreType
 	sysDisk.Volume.Format= "RAW"
 	sysDisk.Volume.Size = float64(specs[0].DiskSize)
 	sysDisk.Volume.SizeInByte = int(specs[0].DiskSize) * 1024 * 1024 * 1024
@@ -289,6 +351,7 @@ func getMultiDisks(dataStore *basetypv1.Storage,
 			disk := initDisk()
 			disk.Volume.DataStoreID = dataStore.ID
 			disk.Volume.DataStoreName = dataStore.Name
+			disk.Volume.DataStoreType = dataStore.DataStoreType
 			disk.Volume.Size = float64(specs[i].DiskSize)
 			disk.Volume.SizeInByte = int(specs[i].DiskSize) * 1024 * 1024 * 1024
 			if specs[i].BusModel != "" {
@@ -317,8 +380,10 @@ func initDisk() basetypv1.Disk {
 		TotalBps: 0,
 		ReadBps: 0,
 		WriteBps: 0,
+		ReadWriteModel: "NONE",
 		Volume: basetypv1.Volume{
 			Bootable: false,
+			ClusterSize: 262144,
 			Format: "RAW",
 			Shared: false,
 			FormatDisk: false,
@@ -340,62 +405,50 @@ func getNetworkSpecs(ctx *context.VMContext, devices []basetypv1.Nic,
 	for index, nic := range devices {
 		if len(ctx.ICSVM.Spec.Network.Devices) > index {
 			network := networks[index]
-			nic.DeviceID = network.ID
-			nic.DeviceName = network.Name
+			if network.VswitchDto.SwitchType == "SDNSWITCH" {
+				nic.DeviceID = network.ResourceID
+				nic.DeviceName = network.Name
+				nic.DeviceType = "ADVANCEDNETWORK"
+			} else {
+				nic.DeviceID = network.ID
+				nic.DeviceName = network.Name
+				nic.DeviceType = "NETWORK"
+			}
 			nic.NetworkID = network.ID
 			nic.VswitchID = network.VswitchDto.ID
-
-			UpdateNicIPConfig(ctx, &nic, &ctx.ICSVM.Spec.Network.Devices[index])
+			nic.SwitchType = network.VswitchDto.SwitchType
+			netSpec := ctx.ICSVM.Spec.Network.Devices[index]
+			if netSpec.DHCP4 || netSpec.DHCP6 {
+				nic.Dhcp = true
+				nic.StaticIp = false
+			}
+			if index == 0 {
+				UpdateNicIPConfig(ctx, &nic, &netSpec)
+			}
 		}
 		netSpec := nic
-		//if len(ctx.ICSVM.Spec.Network.Devices) > index {
-		//	network := networks[index]
-		//	netSpec.DeviceID = network.ID
-		//	netSpec.DeviceName = network.Name
-		//	netSpec.NetworkID = network.ID
-		//	netSpec.VswitchID = network.VswitchDto.ID
-		//
-		//	deviceSpec := &ctx.ICSVM.Spec.Network.Devices[index]
-		//
-		//	// Check to see if the IP is in the list of the device
-		//	// spec's static IP addresses.
-		//	isStatic := true
-		//	if deviceSpec.DHCP4 || deviceSpec.DHCP6 {
-		//		isStatic = false
-		//		netSpec.Dhcp = true
-		//		netSpec.StaticIp = isStatic
-		//	}
-		//	if isStatic {
-		//		ip, netmask, err := infrautilv1.GetIPFromNetworkConfig(ctx, deviceSpec)
-		//		if err == nil {
-		//			netSpec.Dhcp = false
-		//			netSpec.IP = *ip
-		//			netSpec.Netmask = *netmask
-		//			netSpec.Gateway = deviceSpec.Gateway4
-		//			netSpec.StaticIp = isStatic
-		//			netSpec.UserIp = *ip
-		//			netSpec.Ipv4Netmask = *netmask
-		//			netSpec.Ipv4Gateway = deviceSpec.Gateway4
-		//			_, err := infrautilv1.CreateOrUpdateIPAddress(ctx, *ip, netSpec)
-		//			if err != nil {
-		//				continue
-		//			}
-		//		}
-		//	}
-		//}
-
 		deviceSpecs = append(deviceSpecs, netSpec)
 	}
 	if len(networks) > len(devices) {
 		for index := len(devices); index < len(networks); index++ {
 			netSpec := initNic()
 			network := networks[index]
-			netSpec.DeviceID = network.ID
-			netSpec.DeviceName = network.Name
+			if network.VswitchDto.SwitchType == "SDNSWITCH" {
+				netSpec.DeviceID = network.ResourceID
+				netSpec.DeviceName = network.Name
+				netSpec.DeviceType = "ADVANCEDNETWORK"
+			} else {
+				netSpec.DeviceID = network.ID
+				netSpec.DeviceName = network.Name
+				netSpec.DeviceType = "NETWORK"
+			}
 			netSpec.NetworkID = network.ID
 			netSpec.VswitchID = network.VswitchDto.ID
-
-			UpdateNicIPConfig(ctx, &netSpec, &ctx.ICSVM.Spec.Network.Devices[index])
+			netSpec.SwitchType = network.VswitchDto.SwitchType
+			deviceSpec := &ctx.ICSVM.Spec.Network.Devices[index]
+			if deviceSpec.DHCP4 || deviceSpec.DHCP6 {
+				netSpec.Dhcp = true
+			}
 			deviceSpecs = append(deviceSpecs, netSpec)
 		}
 	}
@@ -414,6 +467,7 @@ func initNic() basetypv1.Nic {
 		DownlinkRate: 0,
 		DownlinkBurst: 0,
 		Mac: "",
+		Model: "VIRTIO",
 		Queues: 1,
 		AutoGenerated: true,
 		PriorityEnabled: false,
@@ -429,33 +483,27 @@ func initNic() basetypv1.Nic {
 }
 
 func UpdateNicIPConfig(ctx *context.VMContext, netSpec *basetypv1.Nic, deviceSpec *infrav1.NetworkDeviceSpec) {
-
 	// Check to see if the IP is in the list of the device
 	// spec's static IP addresses.
-	isStatic := true
-	if deviceSpec.DHCP4 || deviceSpec.DHCP6 {
-		isStatic = false
-		netSpec.Dhcp = true
-		netSpec.StaticIp = isStatic
-	} else {
-		ip, netmask, err := infrautilv1.GetIPFromNetworkConfig(ctx, deviceSpec)
-		if err == nil {
-			netSpec.Dhcp = false
-			netSpec.IP = *ip
-			netSpec.Netmask = *netmask
-			netSpec.Gateway = deviceSpec.Gateway4
-			netSpec.StaticIp = isStatic
-			netSpec.UserIp = *ip
-			netSpec.Ipv4Netmask = *netmask
-			netSpec.Ipv4Gateway = deviceSpec.Gateway4
-			_, err := infrautilv1.CreateOrUpdateIPAddress(ctx, *ip, *netSpec)
-			if err != nil {
-				ctx.Logger.Error(err, "fail to create ipAddress for the icsvm")
-			}
-		} else {
-			ctx.Logger.Error(err, "fail to get ip and netmask for the icsvm")
+	allocatedIPMu.Lock()
+	ip, netmask, err := infrautilv1.GetIPFromNetworkConfig(ctx, deviceSpec)
+	if err == nil {
+		netSpec.Dhcp = false
+		netSpec.IP = *ip
+		netSpec.Netmask = *netmask
+		netSpec.Gateway = deviceSpec.Gateway4
+		netSpec.StaticIp = true
+		netSpec.UserIp = *ip
+		netSpec.Ipv4Netmask = *netmask
+		netSpec.Ipv4Gateway = deviceSpec.Gateway4
+		_, err := infrautilv1.CreateOrUpdateIPAddress(ctx, *ip, *netSpec)
+		if err != nil {
+			ctx.Logger.Error(err, "fail to create ipAddress for the icsvm")
 		}
+	} else {
+		ctx.Logger.Error(err, "fail to get ip and netmask for the icsvm")
 	}
+	allocatedIPMu.Unlock()
 }
 
 func getAvailableHosts(ctx *context.VMContext,

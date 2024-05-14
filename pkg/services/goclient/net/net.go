@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"k8s.io/klog"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	basecltv1 "github.com/inspur-ics/ics-go-sdk/client"
@@ -78,25 +79,34 @@ func GetNetworkStatus(
 
 	// set static ip for the second or more nics
 	nicDevices := ctx.ICSVM.Spec.Network.Devices
-	if len(nicDevices) >= 2 {
+	if len(nicDevices) >= 2 && len(vm.Nics) == len(nicDevices) {
 		isStatic := false
 		for i := 1; i < len(nicDevices); i++ {
 			device := nicDevices[i]
 			if device.DHCP4 || device.DHCP6 {
 				continue
 			}
+			nic := vm.Nics[i]
+			if nic.StaticIp {
+				continue
+			}
 			isStatic = true
 			break
 		}
-		if isStatic && len(vm.Nics) == len(nicDevices) {
+		if isStatic {
 			for index := 1; index < len(nicDevices); index++ {
 				device := nicDevices[index]
 				if device.DHCP4 || device.DHCP6 {
 					continue
 				}
+				klog.Info("DavidWang# Edit VM, nic device: %+v", &nicDevices[index])
 				nic := &vm.Nics[index]
-				icenter.UpdateNicIPConfig(ctx, nic, &nicDevices[index])
+				if !nic.StaticIp {
+					icenter.UpdateNicIPConfig(ctx, nic, &nicDevices[index])
+					vm.Nics[index] = *nic
+				}
 			}
+			klog.Infof("edit vm request body: %+v", *vm)
 			task, err := virtualMachineService.SetVM(ctx, *vm)
 			if err != nil {
 				ctx.Logger.Error(err, "failed to set static ips for vm nics", "id", moRef)

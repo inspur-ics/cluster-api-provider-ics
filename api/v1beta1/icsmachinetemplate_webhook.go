@@ -52,12 +52,6 @@ func (r *ICSMachineTemplate) ValidateCreate() error {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "template", "spec", "providerID"), "cannot be set in templates"))
 	}
 
-	for _, device := range spec.Network.Devices {
-		if len(device.IPAddrs) != 0 {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "template", "spec", "network", "devices", "ipAddrs"), "cannot be set in templates"))
-		}
-	}
-
 	return aggregateObjErrors(r.GroupVersionKind().GroupKind(), r.Name, allErrs)
 }
 

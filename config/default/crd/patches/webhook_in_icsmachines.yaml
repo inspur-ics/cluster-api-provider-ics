@@ -6,14 +6,11 @@ metadata:
 spec:
   conversion:
     strategy: Webhook
-    conversionReviewVersions: ["v1", "v1beta1"]
     webhook:
+      conversionReviewVersions: ["v1", "v1beta1"]
       clientConfig:
         caBundle: Cg==
         service:
           namespace: system
           name: webhook-service
           path: /convert
-      conversionReviewVersions:
-        - v1
-        - v1beta1

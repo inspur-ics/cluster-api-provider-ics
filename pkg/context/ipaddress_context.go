@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util/patch"
 
 	infrav1 "github.com/inspur-ics/cluster-api-provider-ics/api/v1beta1"
@@ -30,9 +29,6 @@ import (
 // IPAddressContext is a Go context used with a IPAddress.
 type IPAddressContext struct {
 	*ControllerContext
-	Cluster        *clusterv1.Cluster
-	ICSCluster     *infrav1.ICSCluster
-	ICSVM          *infrav1.ICSVM
 	IPAddress      *infrav1.IPAddress
 	PatchHelper    *patch.Helper
 	Logger         logr.Logger
