@@ -248,6 +248,7 @@ func CloneVM(ctx *context.VMContext, userdata string) error {
 
 	// vm cpu config
 	cpuNum := ctx.ICSVM.Spec.NumCPUs
+	vmTemplate.CPUNum = int(cpuNum)
 	if vmTemplate.CPUNum % 2 == 0 {
 		vmTemplate.CPUCore = 2
 		vmTemplate.CPUSocket = int(cpuNum) / vmTemplate.CPUCore
@@ -288,15 +289,26 @@ func CloneVM(ctx *context.VMContext, userdata string) error {
 	metadata := strings.ReplaceAll(METADATA, "VM_HOST_NAME", vmTemplate.Name)
 	metadata = strings.ReplaceAll(metadata, "VM_UUID", vmTemplate.UUID)
 
+	if user := ctx.ICSVM.Spec.User; user != nil {
+		authFlag := true
+		pwAuth := "\n\nuser: " + user.Name
+		if user.AuthorizedType == infrav1.PasswordToken {
+			pwAuth = pwAuth + "\npassword: " + user.AuthorizedKey
+			pwAuth = pwAuth + "\nchpasswd:\n  expire: false"
+		} else if user.AuthorizedType == infrav1.SSHKey {
+			pwAuth = pwAuth + "\nssh_authorized_keys:\n- " + user.AuthorizedKey
+		} else {
+			authFlag = false
+		}
+		if authFlag {
+			userdata = userdata + pwAuth
+		}
+	}
+
 	vmTemplate.CloudInit = basetypv1.CloudInit{
 		MetaData:       metadata,
 		UserData:       userdata,
 		DataSourceType: CLOUDINITTYPE,
-	}
-
-	if user := ctx.ICSVM.Spec.User; user != nil && user.AuthorizedType == infrav1.PasswordToken {
-		vmTemplate.GuestOSAuthInfo.UserName = user.Name
-		vmTemplate.GuestOSAuthInfo.UserPwd = user.AuthorizedKey
 	}
 
 	klog.Infof("create vm request body: %+v", vmTemplate)
