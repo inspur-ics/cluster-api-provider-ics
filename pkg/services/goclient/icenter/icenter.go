@@ -433,9 +433,10 @@ func getNetworkSpecs(ctx *context.VMContext, devices []basetypv1.Nic,
 			if netSpec.DHCP4 || netSpec.DHCP6 {
 				nic.Dhcp = true
 				nic.StaticIp = false
-			}
-			if index == 0 {
-				UpdateNicIPConfig(ctx, &nic, &netSpec)
+			} else {
+				if index == 0 {
+					UpdateNicIPConfig(ctx, &nic, &netSpec)
+				}
 			}
 		}
 		netSpec := nic
@@ -573,16 +574,21 @@ func getAvailableHosts(ctx *context.VMContext,
 		}
 	}
 
+	memoryInByte := int(ctx.ICSVM.Spec.MemoryMiB * 1024 * 1024)
 	for _, host := range hosts {
 		_, storageOK := storageHostsIndex[host.ID]
 		_, networkOK := networkHostsIndex[host.ID]
 		if storageOK && networkOK {
-			availableHosts = append(availableHosts, host)
+			if host.LogicFreeMemoryInByte > memoryInByte {
+				availableHosts = append(availableHosts, host)
+			}
 		}
 	}
 	if len(availableHosts) > 0 {
 		index := rand.Intn(len(availableHosts))
 		host = availableHosts[index]
+	} else {
+		return host, errors.Errorf("No hosts meet the scheduling conditions, selected 0 from the %d hosts", len(hosts))
 	}
 	return host, nil
 }

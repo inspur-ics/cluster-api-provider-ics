@@ -23,10 +23,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/inspur-ics/cluster-api-provider-ics/pkg/clustermodule"
-	"github.com/inspur-ics/cluster-api-provider-ics/pkg/identity"
-	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services"
-	"github.com/inspur-ics/cluster-api-provider-ics/pkg/session"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -49,9 +45,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	infrav1 "github.com/inspur-ics/cluster-api-provider-ics/api/v1beta1"
+	"github.com/inspur-ics/cluster-api-provider-ics/pkg/clustermodule"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
+	"github.com/inspur-ics/cluster-api-provider-ics/pkg/identity"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/record"
+	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services"
 	basev1 "github.com/inspur-ics/cluster-api-provider-ics/pkg/services/goclient"
+	"github.com/inspur-ics/cluster-api-provider-ics/pkg/session"
 	infrautilv1 "github.com/inspur-ics/cluster-api-provider-ics/pkg/util"
 )
 
@@ -288,20 +288,19 @@ func (r vmReconciler) reconcileDelete(ctx *context.VMContext) (reconcile.Result,
 
 func (r *vmReconciler) reconcileIPAddressesDelete(ctx *context.VMContext) error {
 	ipAddresses := &infrav1.IPAddressList{}
-	vm := ctx.ICSVM
-	err := r.Client.List(goctx.Background(), ipAddresses,
-		ctrlclient.InNamespace(vm.GetNamespace()),
-		ctrlclient.MatchingFields{"spec.vmRef.name": vm.GetName()},
-	)
+	opts := &ctrlclient.ListOptions{
+		Namespace: ctx.ICSVM.Namespace,
+	}
+	err := r.Client.List(goctx.Background(), ipAddresses, opts)
 	if err != nil {
-		r.Logger.Info("Clear icsvm ipaddress resource")
 		return nil
 	}
 	for _, ipAddress := range ipAddresses.Items {
-		if ipAddress.GetDeletionTimestamp().IsZero() {
-			if err := r.Client.Delete(ctx, &ipAddress); err != nil {
-				return err
-			}
+		if ipAddress.Spec.VMRef.Name != ctx.ICSVM.Name || !ipAddress.GetDeletionTimestamp().IsZero() {
+			continue
+		}
+		if err := r.Client.Delete(ctx, &ipAddress); err != nil {
+			return err
 		}
 	}
 
@@ -342,6 +341,13 @@ func (r vmReconciler) reconcileNormal(ctx *context.VMContext, icsMachine *infrav
 	// Get or create the VM.
 	vm, err := vmService.ReconcileVM(ctx)
 	if err != nil {
+		if err != nil && err.Error() == infrav1.PoweringOnFailedReason {
+			var vmService services.VirtualMachineService = &basev1.VMService{}
+			_, _ = vmService.DestroyVM(ctx)
+			_ = r.reconcileIPAddressesDelete(ctx)
+			ctx.ICSVM.Spec.UID = ""
+			ctx.ICSVM.Spec.BiosUUID = ""
+		}
 		ctx.Logger.Error(err, "error reconciling VM")
 		return reconcile.Result{}, errors.Wrapf(err, "failed to reconcile VM")
 	}

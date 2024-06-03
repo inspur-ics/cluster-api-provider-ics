@@ -162,15 +162,15 @@ func (r ipAddressReconciler) reconcileNormal(ctx *context.IPAddressContext) (rec
 func (r ipAddressReconciler) getVMToIPAddressesReq(a ctrlclient.Object) []reconcile.Request {
 	requests := []reconcile.Request{}
 	ipAddresses := &infrav1.IPAddressList{}
-	err := r.Client.List(goctx.Background(), ipAddresses,
-		ctrlclient.InNamespace(a.GetNamespace()),
-		ctrlclient.MatchingFields{"spec.vmRef.name": a.GetName()},
-	)
+	opts := &ctrlclient.ListOptions{
+		Namespace: a.GetNamespace(),
+	}
+	err := r.Client.List(goctx.Background(), ipAddresses, opts)
 	if err != nil {
 		return requests
 	}
 	for _, ipAddress := range ipAddresses.Items {
-		if !ipAddress.ObjectMeta.DeletionTimestamp.IsZero() {
+		if ipAddress.Spec.VMRef.Name != a.GetName() || !ipAddress.ObjectMeta.DeletionTimestamp.IsZero() {
 			continue
 		}
 		r := reconcile.Request{

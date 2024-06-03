@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
 
+	basehstv1 "github.com/inspur-ics/ics-go-sdk/host"
 	basetkv1 "github.com/inspur-ics/ics-go-sdk/task"
 	basevmv1 "github.com/inspur-ics/ics-go-sdk/vm"
 
@@ -82,10 +83,7 @@ func (vms *VMService) ReconcileVM(ctx *context.VMContext) (vm infrav1.VirtualMac
 		return vm, basev1.CreateVM(ctx, string(metadataBytes))
 	}
 
-	//
 	// At this point we know the VM exists, so it needs to be updated.
-	//
-
 	// Create a new virtualMachineContext to reconcile the VM.
 	vmCtx := &virtualMachineContext{
 		VMContext: *ctx,
@@ -96,7 +94,6 @@ func (vms *VMService) ReconcileVM(ctx *context.VMContext) (vm infrav1.VirtualMac
 
 	vms.reconcileUUID(vmCtx)
 
-	//TODO [WYC] check network business
 	if err := vms.reconcileNetworkStatus(vmCtx); err != nil {
 		return vm, err
 	}
@@ -203,28 +200,6 @@ func (vms *VMService) reconcileNetworkStatus(ctx *virtualMachineContext) error {
 	return nil
 }
 
-//func (vms *VMService) reconcileMetadata(ctx *virtualMachineContext, newMetadata []byte) (bool, error) {
-//	existingMetadata, err := vms.getMetadata(ctx)
-//	if err != nil {
-//		return false, err
-//	}
-//
-//	// If the metadata is the same then return early.
-//	if string(newMetadata) == existingMetadata {
-//		return true, nil
-//	}
-//
-//	taskRef, err := vms.setMetadata(ctx, newMetadata)
-//	if err != nil {
-//		return false, errors.Wrapf(err, "unable to set metadata on vm %s", ctx)
-//	}
-//	time.Sleep(time.Duration(3) * time.Second)
-//
-//	ctx.ICSVM.Status.TaskRef = taskRef
-//	ctx.Logger.Info("VM metadata to be updated")
-//	return false, nil
-//}
-
 func (vms *VMService) reconcilePowerState(ctx *virtualMachineContext) (bool, error) {
 	powerState, err := vms.getPowerState(ctx)
 	if err != nil {
@@ -233,6 +208,18 @@ func (vms *VMService) reconcilePowerState(ctx *virtualMachineContext) (bool, err
 	switch powerState {
 	case infrav1.VirtualMachinePowerStatePoweredOff:
 		ctx.Logger.Info("powering on")
+		vm, err := ctx.Obj.GetVM(ctx, ctx.Ref.Value)
+		if err != nil {
+			return false, nil
+		}
+		hostService := basehstv1.NewHostService(ctx.Session.Client)
+		host, err := hostService.GetHost(ctx, vm.HostID)
+		if err != nil {
+			return false, nil
+		}
+		if vm.MemoryInByte >= host.FreeMemoryInByte || vm.MemoryInByte >= host.LogicFreeMemoryInByte {
+			return false, errors.New(infrav1.PoweringOnFailedReason)
+		}
 		task, err := ctx.Obj.PowerOnVM(ctx, ctx.Ref.Value)
 		if err != nil {
 			return false, errors.Wrapf(err, "failed to trigger power on op for vm %s", ctx)
@@ -246,9 +233,13 @@ func (vms *VMService) reconcilePowerState(ctx *virtualMachineContext) (bool, err
 		reconcileICSVMWhenNetworkIsReady(ctx, task)
 
 		taskService := basetkv1.NewTaskService(ctx.Session.Client)
-		_, _ = taskService.WaitForResult(ctx, task)
-
-		ctx.Logger.Info("wait for VM to be powered on")
+		taskInfo, _ := taskService.WaitForResult(ctx, task)
+		if taskInfo != nil && taskInfo.State == "ERROR" {
+			ctx.Logger.Error(errors.New(taskInfo.Error), "failed to trigger power on the vm")
+			return false, errors.New(infrav1.PoweringOnFailedReason)
+		} else {
+			ctx.Logger.Info("wait for VM to be powered on")
+		}
 		return false, nil
 	case infrav1.VirtualMachinePowerStatePoweredOn:
 		ctx.Logger.Info("powered on")
@@ -334,48 +325,6 @@ func (vms *VMService) getPowerState(ctx *virtualMachineContext) (infrav1.Virtual
 		return "", errors.Errorf("unexpected power state %q for vm %s", vmObj.Status, ctx)
 	}
 }
-
-//func (vms *VMService) getMetadata(ctx *virtualMachineContext) (string, error) {
-//	vm, err := ctx.Obj.GetVM(ctx, ctx.Ref.Value)
-//	if err != nil {
-//		return "", errors.Wrapf(err, "unable to cloud init meta data for vm %s", ctx.Ref.Value)
-//	}
-//
-//	metadataBase64 := vm.ExtendData
-//	if metadataBase64 == "" {
-//		return "", nil
-//	}
-//
-//	metadataBuf, err := base64.StdEncoding.DecodeString(metadataBase64)
-//	if err != nil {
-//		return "", errors.Wrapf(err, "unable to decode metadata for %s", ctx)
-//	}
-//
-//	return string(metadataBuf), nil
-//}
-//
-//func (vms *VMService) setMetadata(ctx *virtualMachineContext, metadata []byte) (string, error) {
-//	metadataBase64 := base64.StdEncoding.EncodeToString(metadata)
-//
-//	vmObj, err := ctx.Obj.GetVM(ctx, ctx.Ref.Value)
-//	if err != nil {
-//		return "", errors.Wrapf(err, "unable to get vm %s", ctx.Ref.Value)
-//	}
-//
-//	vmObj.ExtendData = metadataBase64
-//	vmObj.CloudInited = true
-//
-//	task, err := ctx.Obj.SetVM(ctx, *vmObj)
-//	if err != nil {
-//		return "", errors.Wrapf(err, "unable to set metadata on vm %s", ctx)
-//	}
-//
-//	// Wait for the VM to be edited.
-//	taskService := basetkv1.NewTaskService(ctx.Session.Client)
-//	_, _ = taskService.WaitForResult(ctx, task)
-//
-//	return task.TaskId, nil
-//}
 
 func (vms *VMService) getNetworkStatus(ctx *virtualMachineContext) ([]infrav1.NetworkStatus, error) {
 	allNetStatus, err := net.GetNetworkStatus(&ctx.VMContext, ctx.Session.Client, ctx.Ref)
