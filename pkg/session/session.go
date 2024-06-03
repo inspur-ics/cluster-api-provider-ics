@@ -125,7 +125,7 @@ func GetOrCreate(ctx context.Context, params *Params) (*Session, error) {
 		}
 
 		if vimSessionActive {
-			logger.V(2).Info("found active cached ICS client session")
+			//logger.V(2).Info("found active cached ICS client session")
 			return s, nil
 		}
 	}
@@ -169,7 +169,7 @@ func Get(ctx context.Context, sessionKey string) (*Session, error) {
 		}
 
 		if vimSessionActive {
-			logger.V(2).Info("found active cached ICS client session")
+			//logger.V(2).Info("found active cached ICS client session")
 			return s, nil
 		}
 	}

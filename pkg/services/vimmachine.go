@@ -142,7 +142,7 @@ func (v *VimMachineService) ReconcileNormal(c context.MachineContext) (bool, err
 		if err != nil {
 			return false, errors.Wrapf(err, "unexpected error while reconciling ready state for %s", ctx)
 		}
-		ctx.Logger.Info("waiting for ready state")
+		// ctx.Logger.Info("waiting for ready state")
 		// ICSMachine wraps a VMSphereVM, so we are mirroring status from the underlying VMSphereVM
 		// in order to provide evidences about machine provisioning while provisioning is actually happening.
 		conditions.SetMirror(ctx.ICSMachine, infrav1.VMProvisionedCondition, conditions.UnstructuredGetter(vmObj))
@@ -218,14 +218,10 @@ func (v *VimMachineService) waitReadyState(ctx *context.VIMMachineContext, vm *u
 				vm.GetName(),
 				ctx)
 		}
-		ctx.Logger.Info("status.ready not found",
-			"vmGVK", vm.GroupVersionKind().String(),
-			"vmNamespace", vm.GetNamespace(),
-			"vmName", vm.GetName())
 		return false, nil
 	}
 	if !ready {
-		ctx.Logger.Info("status.ready is false",
+		ctx.Logger.Info("ICS VM is not ready",
 			"vmGVK", vm.GroupVersionKind().String(),
 			"vmNamespace", vm.GetNamespace(),
 			"vmName", vm.GetName())
@@ -246,14 +242,14 @@ func (v *VimMachineService) reconcileProviderID(ctx *context.VIMMachineContext, 
 				vm.GetName(),
 				ctx)
 		}
-		ctx.Logger.Info("spec.biosUUID not found",
+		ctx.Logger.Info("ICS VM biosUUID not found",
 			"vmGVK", vm.GroupVersionKind().String(),
 			"vmNamespace", vm.GetNamespace(),
 			"vmName", vm.GetName())
 		return false, nil
 	}
 	if biosUUID == "" {
-		ctx.Logger.Info("spec.biosUUID is empty",
+		ctx.Logger.Info("ICS VM biosUUID is empty",
 			"vmGVK", vm.GroupVersionKind().String(),
 			"vmNamespace", vm.GetNamespace(),
 			"vmName", vm.GetName())
