@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"k8s.io/klog"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	basecltv1 "github.com/inspur-ics/ics-go-sdk/client"
@@ -99,14 +98,12 @@ func GetNetworkStatus(
 				if device.DHCP4 || device.DHCP6 {
 					continue
 				}
-				klog.Info("DavidWang# Edit VM, nic device: %+v", &nicDevices[index])
 				nic := &vm.Nics[index]
 				if !nic.StaticIp {
 					icenter.UpdateNicIPConfig(ctx, nic, &nicDevices[index])
 					vm.Nics[index] = *nic
 				}
 			}
-			klog.Infof("edit vm request body: %+v", *vm)
 			task, err := virtualMachineService.SetVM(ctx, *vm)
 			if err != nil {
 				ctx.Logger.Error(err, "failed to set static ips for vm nics", "id", moRef)

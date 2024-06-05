@@ -22,13 +22,11 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
-	"k8s.io/klog"
-
 	infrav1 "github.com/inspur-ics/cluster-api-provider-ics/api/v1beta1"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/context"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/goclient/image"
 	"github.com/inspur-ics/cluster-api-provider-ics/pkg/services/goclient/template"
+	"github.com/pkg/errors"
 
 	infrautilv1 "github.com/inspur-ics/cluster-api-provider-ics/pkg/util"
 	basetypv1 "github.com/inspur-ics/ics-go-sdk/client/types"
@@ -310,8 +308,6 @@ func CloneVM(ctx *context.VMContext, userdata string) error {
 		UserData:       userdata,
 		DataSourceType: CLOUDINITTYPE,
 	}
-
-	klog.Infof("create vm request body: %+v", vmTemplate)
 
 	virtualMachineService := basevmv1.NewVirtualMachineService(ctx.GetSession().Client)
 	task, err := virtualMachineService.CreateVMByTemplate(ctx, vmTemplate, true)

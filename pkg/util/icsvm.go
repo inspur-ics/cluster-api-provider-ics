@@ -25,7 +25,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/klog"
 	clusterutilv1 "sigs.k8s.io/cluster-api/util"
 	ctrlutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -66,7 +65,6 @@ func CreateOrUpdateIPAddress(ctx *context.VMContext, ipAddressName string, netwo
 		ipAddress.Spec.MACAddr = network.Mac
 		return nil
 	}
-	klog.Infof("DavidWang IPAddress: %+v", ipAddress)
 	if _, err := ctrlutil.CreateOrUpdate(ctx, ctx.Client, ipAddress, mutateFn); err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			ctx.Logger.Info("IPAddress already exists")
