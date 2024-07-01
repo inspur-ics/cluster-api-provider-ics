@@ -517,6 +517,11 @@ spec:
                       description: NetworkDeviceSpec defines the network configuration
                         for a virtual machine's network device.
                       properties:
+                        deviceID:
+                          description: DeviceID may be used to explicitly assign a
+                            name to the network device as it exists in the guest operating
+                            system.
+                          type: string
                         deviceName:
                           description: DeviceName may be used to explicitly assign
                             a name to the network device as it exists in the guest
@@ -551,8 +556,7 @@ spec:
                           description: MACAddr is the MAC address used by this device.
                             It is generally a good idea to omit this field and allow
                             a MAC address to be generated. Please note that this value
-                            must use the InCloud Sphere OUI to work with the in-tree
-                            ics cloud provider.
+                            must use the OUI to work with the in-tree ics cloud provider.
                           type: string
                         mtu:
                           description: MTU is the device’s Maximum Transmission Unit
@@ -568,6 +572,10 @@ spec:
                           type: array
                         netMask:
                           description: NetMask the network device network.
+                          type: string
+                        networkID:
+                          description: NetworkID is the ID of the ics network to which
+                            the device will be connected.
                           type: string
                         networkName:
                           description: NetworkName is the name of the ics network
@@ -612,7 +620,9 @@ spec:
                             to which the device will be connected.
                           type: string
                       required:
+                      - networkID
                       - networkName
+                      - switchType
                       type: object
                     type: array
                   preferredAPIServerCidr:
@@ -924,6 +934,11 @@ spec:
                       description: NetworkDeviceSpec defines the network configuration
                         for a virtual machine's network device.
                       properties:
+                        deviceID:
+                          description: DeviceID may be used to explicitly assign a
+                            name to the network device as it exists in the guest operating
+                            system.
+                          type: string
                         deviceName:
                           description: DeviceName may be used to explicitly assign
                             a name to the network device as it exists in the guest
@@ -958,8 +973,7 @@ spec:
                           description: MACAddr is the MAC address used by this device.
                             It is generally a good idea to omit this field and allow
                             a MAC address to be generated. Please note that this value
-                            must use the InCloud Sphere OUI to work with the in-tree
-                            ics cloud provider.
+                            must use the OUI to work with the in-tree ics cloud provider.
                           type: string
                         mtu:
                           description: MTU is the device’s Maximum Transmission Unit
@@ -975,6 +989,10 @@ spec:
                           type: array
                         netMask:
                           description: NetMask the network device network.
+                          type: string
+                        networkID:
+                          description: NetworkID is the ID of the ics network to which
+                            the device will be connected.
                           type: string
                         networkName:
                           description: NetworkName is the name of the ics network
@@ -1019,7 +1037,9 @@ spec:
                             to which the device will be connected.
                           type: string
                       required:
+                      - networkID
                       - networkName
+                      - switchType
                       type: object
                     type: array
                   preferredAPIServerCidr:
@@ -1382,6 +1402,11 @@ spec:
                               description: NetworkDeviceSpec defines the network configuration
                                 for a virtual machine's network device.
                               properties:
+                                deviceID:
+                                  description: DeviceID may be used to explicitly
+                                    assign a name to the network device as it exists
+                                    in the guest operating system.
+                                  type: string
                                 deviceName:
                                   description: DeviceName may be used to explicitly
                                     assign a name to the network device as it exists
@@ -1418,9 +1443,8 @@ spec:
                                   description: MACAddr is the MAC address used by
                                     this device. It is generally a good idea to omit
                                     this field and allow a MAC address to be generated.
-                                    Please note that this value must use the InCloud
-                                    Sphere OUI to work with the in-tree ics cloud
-                                    provider.
+                                    Please note that this value must use the OUI to
+                                    work with the in-tree ics cloud provider.
                                   type: string
                                 mtu:
                                   description: MTU is the device’s Maximum Transmission
@@ -1437,6 +1461,10 @@ spec:
                                   type: array
                                 netMask:
                                   description: NetMask the network device network.
+                                  type: string
+                                networkID:
+                                  description: NetworkID is the ID of the ics network
+                                    to which the device will be connected.
                                   type: string
                                 networkName:
                                   description: NetworkName is the name of the ics
@@ -1481,7 +1509,9 @@ spec:
                                     network to which the device will be connected.
                                   type: string
                               required:
+                              - networkID
                               - networkName
+                              - switchType
                               type: object
                             type: array
                           preferredAPIServerCidr:
@@ -1687,6 +1717,11 @@ spec:
                               description: NetworkDeviceSpec defines the network configuration
                                 for a virtual machine's network device.
                               properties:
+                                deviceID:
+                                  description: DeviceID may be used to explicitly
+                                    assign a name to the network device as it exists
+                                    in the guest operating system.
+                                  type: string
                                 deviceName:
                                   description: DeviceName may be used to explicitly
                                     assign a name to the network device as it exists
@@ -1723,9 +1758,8 @@ spec:
                                   description: MACAddr is the MAC address used by
                                     this device. It is generally a good idea to omit
                                     this field and allow a MAC address to be generated.
-                                    Please note that this value must use the InCloud
-                                    Sphere OUI to work with the in-tree ics cloud
-                                    provider.
+                                    Please note that this value must use the OUI to
+                                    work with the in-tree ics cloud provider.
                                   type: string
                                 mtu:
                                   description: MTU is the device’s Maximum Transmission
@@ -1742,6 +1776,10 @@ spec:
                                   type: array
                                 netMask:
                                   description: NetMask the network device network.
+                                  type: string
+                                networkID:
+                                  description: NetworkID is the ID of the ics network
+                                    to which the device will be connected.
                                   type: string
                                 networkName:
                                   description: NetworkName is the name of the ics
@@ -1786,7 +1824,9 @@ spec:
                                     network to which the device will be connected.
                                   type: string
                               required:
+                              - networkID
                               - networkName
+                              - switchType
                               type: object
                             type: array
                           preferredAPIServerCidr:
@@ -2070,6 +2110,11 @@ spec:
                       description: NetworkDeviceSpec defines the network configuration
                         for a virtual machine's network device.
                       properties:
+                        deviceID:
+                          description: DeviceID may be used to explicitly assign a
+                            name to the network device as it exists in the guest operating
+                            system.
+                          type: string
                         deviceName:
                           description: DeviceName may be used to explicitly assign
                             a name to the network device as it exists in the guest
@@ -2104,8 +2149,7 @@ spec:
                           description: MACAddr is the MAC address used by this device.
                             It is generally a good idea to omit this field and allow
                             a MAC address to be generated. Please note that this value
-                            must use the InCloud Sphere OUI to work with the in-tree
-                            ics cloud provider.
+                            must use the OUI to work with the in-tree ics cloud provider.
                           type: string
                         mtu:
                           description: MTU is the device’s Maximum Transmission Unit
@@ -2121,6 +2165,10 @@ spec:
                           type: array
                         netMask:
                           description: NetMask the network device network.
+                          type: string
+                        networkID:
+                          description: NetworkID is the ID of the ics network to which
+                            the device will be connected.
                           type: string
                         networkName:
                           description: NetworkName is the name of the ics network
@@ -2165,7 +2213,9 @@ spec:
                             to which the device will be connected.
                           type: string
                       required:
+                      - networkID
                       - networkName
+                      - switchType
                       type: object
                     type: array
                   preferredAPIServerCidr:
@@ -2531,6 +2581,11 @@ spec:
                       description: NetworkDeviceSpec defines the network configuration
                         for a virtual machine's network device.
                       properties:
+                        deviceID:
+                          description: DeviceID may be used to explicitly assign a
+                            name to the network device as it exists in the guest operating
+                            system.
+                          type: string
                         deviceName:
                           description: DeviceName may be used to explicitly assign
                             a name to the network device as it exists in the guest
@@ -2565,8 +2620,7 @@ spec:
                           description: MACAddr is the MAC address used by this device.
                             It is generally a good idea to omit this field and allow
                             a MAC address to be generated. Please note that this value
-                            must use the InCloud Sphere OUI to work with the in-tree
-                            ics cloud provider.
+                            must use the OUI to work with the in-tree ics cloud provider.
                           type: string
                         mtu:
                           description: MTU is the device’s Maximum Transmission Unit
@@ -2582,6 +2636,10 @@ spec:
                           type: array
                         netMask:
                           description: NetMask the network device network.
+                          type: string
+                        networkID:
+                          description: NetworkID is the ID of the ics network to which
+                            the device will be connected.
                           type: string
                         networkName:
                           description: NetworkName is the name of the ics network
@@ -2626,7 +2684,9 @@ spec:
                             to which the device will be connected.
                           type: string
                       required:
+                      - networkID
                       - networkName
+                      - switchType
                       type: object
                     type: array
                   preferredAPIServerCidr:
@@ -2917,8 +2977,8 @@ spec:
               macAddr:
                 description: MACAddr is the MAC address used by this device. It is
                   generally a good idea to omit this field and allow a MAC address
-                  to be generated. Please note that this value must use the InCloud
-                  Sphere OUI to work with the in-tree ics cloud provider.
+                  to be generated. Please note that this value must use the OUI to
+                  work with the in-tree ics cloud provider.
                 type: string
               prefix:
                 description: Prefix is the mask of the network as integer (max 128)
@@ -3041,8 +3101,8 @@ spec:
               macAddr:
                 description: MACAddr is the MAC address used by this device. It is
                   generally a good idea to omit this field and allow a MAC address
-                  to be generated. Please note that this value must use the InCloud
-                  Sphere OUI to work with the in-tree ics cloud provider.
+                  to be generated. Please note that this value must use the OUI to
+                  work with the in-tree ics cloud provider.
                 type: string
               prefix:
                 description: Prefix is the mask of the network as integer (max 128)

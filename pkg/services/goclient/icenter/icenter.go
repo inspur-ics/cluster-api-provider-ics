@@ -47,6 +47,12 @@ const (
 }
 `
 	CLOUDINITTYPE string = "OPENSTACK"
+
+	NormalSwitchType string = "NORMALSWITCH"
+	LocalSDNSwitchType string = "SDNSWITCH"
+	ExtSDNSwitchType string = "VXLANOPENSTACKSWITCH"
+	SDNDeviceType string = "ADVANCEDNETWORK"
+	NormalDeviceType string = "NETWORK"
 )
 
 var (
@@ -88,24 +94,30 @@ func ImportVM(ctx *context.VMContext, userdata string) error {
 	networks := make(map[int]basetypv1.Network)
 	networkService := basenetv1.NewNetworkService(ctx.GetSession().Client)
 	for index, device := range ctx.ICSVM.Spec.Network.Devices {
-		network, err := networkService.GetNetworkByName(ctx, device.NetworkName)
-		if err != nil {
-			ctx.Logger.Error(err, "fail to find the network devices from ics")
-			return errors.Wrapf(err, "unable to get networks for %q", ctx)
-		}
-		if network.VswitchDto.SwitchType == "SDNSWITCH" && len(device.DeviceName) > 0 {
-			sdnNet, err := networkService.GetSdnNetworkByID(ctx, network.ID)
-			if err == nil {
-				for _, subNet := range sdnNet.SubnetKeys {
-					if subNet.Name == device.DeviceName {
-						network.ResourceID = subNet.ID
-						network.Name = subNet.Name
-						break
-					}
-				}
+		if device.SwitchType == NormalSwitchType || device.SwitchType == LocalSDNSwitchType {
+			network, err := networkService.GetNetworkByID(ctx, device.NetworkID)
+			if err != nil {
+				ctx.Logger.Error(err, "fail to find the network devices from ics")
+				return errors.Wrapf(err, "unable to get networks for %q", ctx)
 			}
+			if device.SwitchType == LocalSDNSwitchType {
+				network.ResourceID = device.DeviceID
+				network.Name = device.DeviceName
+			}
+			networks[index] = *network
+		} else if device.SwitchType == ExtSDNSwitchType {
+			network := basetypv1.Network{
+				ID:         device.NetworkID,
+				Name:       device.DeviceName,
+				ResourceID: device.DeviceID,
+				VswitchDto: basetypv1.Switch{
+					SwitchType: ExtSDNSwitchType,
+				},
+			}
+			networks[index] = network
+		} else {
+			ctx.Logger.Error(errors.New("Network Error"), "Failed to config the network switch type by the ICS version")
 		}
-		networks[index] = *network
 	}
 
 	host, err := getAvailableHosts(ctx, *dataStore, networks)
@@ -216,23 +228,30 @@ func CloneVM(ctx *context.VMContext, userdata string) error {
 	networks := make(map[int]basetypv1.Network)
 	networkService := basenetv1.NewNetworkService(ctx.GetSession().Client)
 	for index, device := range ctx.ICSVM.Spec.Network.Devices {
-		network, err := networkService.GetNetworkByName(ctx, device.NetworkName)
-		if err != nil {
-			ctx.Logger.Error(err, "fail to find the network devices from ics")
-			return errors.Wrapf(err, "unable to get networks for %q", ctx)
-		}
-		if network.VswitchDto.SwitchType == "SDNSWITCH" && len(device.DeviceName) > 0 {
-			sdnNet, err := networkService.GetSdnNetworkByID(ctx, network.ID)
-			if err == nil {
-				for _, subNet := range sdnNet.SubnetKeys {
-					if subNet.Name == device.DeviceName {
-						network.ResourceID = subNet.ID
-						break
-					}
-				}
+		if device.SwitchType == NormalSwitchType || device.SwitchType == LocalSDNSwitchType {
+			network, err := networkService.GetNetworkByName(ctx, device.NetworkName)
+			if err != nil {
+				ctx.Logger.Error(err, "fail to find the network devices from ics")
+				return errors.Wrapf(err, "unable to get networks for %q", ctx)
 			}
+			if device.SwitchType == LocalSDNSwitchType {
+				network.ResourceID = device.DeviceID
+				network.Name = device.DeviceName
+			}
+			networks[index] = *network
+		} else if device.SwitchType == ExtSDNSwitchType {
+			network := basetypv1.Network{
+				ID:         device.NetworkID,
+				Name:       device.DeviceName,
+				ResourceID: device.DeviceID,
+				VswitchDto: basetypv1.Switch{
+					SwitchType: ExtSDNSwitchType,
+				},
+			}
+			networks[index] = network
+		} else {
+			ctx.Logger.Error(errors.New("Network Error"), "Failed to config the network switch type by the ICS version")
 		}
-		networks[index] = *network
 	}
 
 	host, err := getAvailableHosts(ctx, *dataStore, networks)
@@ -413,17 +432,16 @@ func getNetworkSpecs(ctx *context.VMContext, devices []basetypv1.Nic,
 	for index, nic := range devices {
 		if len(ctx.ICSVM.Spec.Network.Devices) > index {
 			network := networks[index]
-			if network.VswitchDto.SwitchType == "SDNSWITCH" {
+			if network.VswitchDto.SwitchType == LocalSDNSwitchType || network.VswitchDto.SwitchType == ExtSDNSwitchType {
 				nic.DeviceID = network.ResourceID
 				nic.DeviceName = network.Name
-				nic.DeviceType = "ADVANCEDNETWORK"
+				nic.DeviceType = SDNDeviceType
 			} else {
 				nic.DeviceID = network.ID
 				nic.DeviceName = network.Name
-				nic.DeviceType = "NETWORK"
+				nic.DeviceType = NormalDeviceType
 			}
 			nic.NetworkID = network.ID
-			nic.VswitchID = network.VswitchDto.ID
 			nic.SwitchType = network.VswitchDto.SwitchType
 			netSpec := ctx.ICSVM.Spec.Network.Devices[index]
 			if netSpec.DHCP4 || netSpec.DHCP6 {
@@ -442,17 +460,16 @@ func getNetworkSpecs(ctx *context.VMContext, devices []basetypv1.Nic,
 		for index := len(devices); index < len(networks); index++ {
 			netSpec := initNic()
 			network := networks[index]
-			if network.VswitchDto.SwitchType == "SDNSWITCH" {
+			if network.VswitchDto.SwitchType == LocalSDNSwitchType || network.VswitchDto.SwitchType == ExtSDNSwitchType {
 				netSpec.DeviceID = network.ResourceID
 				netSpec.DeviceName = network.Name
-				netSpec.DeviceType = "ADVANCEDNETWORK"
+				netSpec.DeviceType = SDNDeviceType
 			} else {
 				netSpec.DeviceID = network.ID
 				netSpec.DeviceName = network.Name
-				netSpec.DeviceType = "NETWORK"
+				netSpec.DeviceType = NormalDeviceType
 			}
 			netSpec.NetworkID = network.ID
-			netSpec.VswitchID = network.VswitchDto.ID
 			netSpec.SwitchType = network.VswitchDto.SwitchType
 			deviceSpec := &ctx.ICSVM.Spec.Network.Devices[index]
 			if deviceSpec.DHCP4 || deviceSpec.DHCP6 {
@@ -553,9 +570,17 @@ func getAvailableHosts(ctx *context.VMContext,
 
 	hostBounds := make(map[string]int)
 	for _, network := range networks {
-		networkHosts, err := hostService.GetHostListByNetworkID(ctx, network.ID)
-		if err != nil {
-			return basetypv1.Host{}, err
+		var  networkHosts []basetypv1.Host
+		if network.VswitchDto.SwitchType == NormalSwitchType || network.VswitchDto.SwitchType == LocalSDNSwitchType {
+			networkHosts, err = hostService.GetHostListByNetworkID(ctx, network.ID)
+			if err != nil {
+				return basetypv1.Host{}, err
+			}
+		} else if network.VswitchDto.SwitchType == ExtSDNSwitchType {
+			networkHosts, err = hostService.GetHostListByExtSdnNetworkID(ctx, network.ID)
+			if err != nil {
+				return basetypv1.Host{}, err
+			}
 		}
 		for _, host := range networkHosts {
 			if host.ID != "" {

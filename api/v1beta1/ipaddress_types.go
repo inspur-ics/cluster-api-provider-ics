@@ -49,7 +49,7 @@ type IPAddressSpec struct {
 	// MACAddr is the MAC address used by this device.
 	// It is generally a good idea to omit this field and allow a MAC address
 	// to be generated.
-	// Please note that this value must use the InCloud Sphere OUI to work with the
+	// Please note that this value must use the OUI to work with the
 	// in-tree ics cloud provider.
 	// +optional
 	MACAddr string `json:"macAddr,omitempty"`

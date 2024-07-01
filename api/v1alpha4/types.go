@@ -195,6 +195,13 @@ type NetworkSpec struct {
 // NetworkDeviceSpec defines the network configuration for a virtual machine's
 // network device.
 type NetworkDeviceSpec struct {
+	// SwitchType the type of the ics switch network to which the device will be connected.
+	SwitchType string `json:"switchType"`
+
+	// NetworkID is the ID of the ics network to which the device
+	// will be connected.
+	NetworkID string `json:"networkID"`
+
 	// NetworkName is the name of the ics network to which the device
 	// will be connected.
 	NetworkName string `json:"networkName"`
@@ -203,9 +210,10 @@ type NetworkDeviceSpec struct {
 	// +optional
 	NetworkType string `json:"networkType,omitempty"`
 
-	// SwitchType the type of the ics switch network to which the device will be connected.
+	// DeviceID may be used to explicitly assign a name to the network device
+	// as it exists in the guest operating system.
 	// +optional
-	SwitchType string `json:"switchType,omitempty"`
+	DeviceID string `json:"deviceID,omitempty"`
 
 	// DeviceName may be used to explicitly assign a name to the network device
 	// as it exists in the guest operating system.
@@ -251,7 +259,7 @@ type NetworkDeviceSpec struct {
 	// MACAddr is the MAC address used by this device.
 	// It is generally a good idea to omit this field and allow a MAC address
 	// to be generated.
-	// Please note that this value must use the InCloud Sphere OUI to work with the
+	// Please note that this value must use the OUI to work with the
 	// in-tree ics cloud provider.
 	// +optional
 	MACAddr string `json:"macAddr,omitempty"`

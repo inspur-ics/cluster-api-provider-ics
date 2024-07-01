@@ -936,9 +936,11 @@ func Convert_v1beta1_IPAddressSpec_To_v1alpha4_IPAddressSpec(in *v1beta1.IPAddre
 }
 
 func autoConvert_v1alpha4_NetworkDeviceSpec_To_v1beta1_NetworkDeviceSpec(in *NetworkDeviceSpec, out *v1beta1.NetworkDeviceSpec, s conversion.Scope) error {
+	out.SwitchType = in.SwitchType
+	out.NetworkID = in.NetworkID
 	out.NetworkName = in.NetworkName
 	out.NetworkType = in.NetworkType
-	out.SwitchType = in.SwitchType
+	out.DeviceID = in.DeviceID
 	out.DeviceName = in.DeviceName
 	out.DHCP4 = in.DHCP4
 	out.DHCP6 = in.DHCP6
@@ -960,9 +962,11 @@ func Convert_v1alpha4_NetworkDeviceSpec_To_v1beta1_NetworkDeviceSpec(in *Network
 }
 
 func autoConvert_v1beta1_NetworkDeviceSpec_To_v1alpha4_NetworkDeviceSpec(in *v1beta1.NetworkDeviceSpec, out *NetworkDeviceSpec, s conversion.Scope) error {
+	out.SwitchType = in.SwitchType
+	out.NetworkID = in.NetworkID
 	out.NetworkName = in.NetworkName
 	out.NetworkType = in.NetworkType
-	out.SwitchType = in.SwitchType
+	out.DeviceID = in.DeviceID
 	out.DeviceName = in.DeviceName
 	out.DHCP4 = in.DHCP4
 	out.DHCP6 = in.DHCP6
